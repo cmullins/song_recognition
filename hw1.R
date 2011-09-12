@@ -72,13 +72,13 @@ m_print('Generating plots...')
 
 generate_plot('case1.png',
 	function() {
-		create_scatter_plot(pd_train, case1_fn)
+		create_scatter_plot(pd_train, case1_fn, "Case 1 Results")
 	})
 generate_plot('case2.png',
 	function() {
-		create_scatter_plot(pd_train, case2_fn)
+		create_scatter_plot(pd_train, case2_fn, "Case 2 Results")
 	})
 generate_plot('case3.png',
 	function() {
-		create_scatter_plot(pd_train, case3_fn)
+		create_scatter_plot(pd_train, case3_fn, "Case 3 Results")
 	})

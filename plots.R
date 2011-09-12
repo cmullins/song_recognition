@@ -17,11 +17,11 @@ settings <- list(
 
 # Routines to generate plots
 
-create_scatter_plot <- function(prepared_data, d_fns) {
+create_scatter_plot <- function(prepared_data, d_fns, title = NULL) {
 	orig_cols <- palette() # save palette
 
 	# Set up the canvas
-	prepare_scatter_plot(prepared_data)
+	prepare_scatter_plot(prepared_data, title)
 
 	# Paint decision regions
 	palette(settings$bg_palette) # use bg colors
@@ -38,13 +38,14 @@ create_scatter_plot <- function(prepared_data, d_fns) {
 }
 
 # Sets up the canvas
-prepare_scatter_plot <- function(prepared_data) {
+prepare_scatter_plot <- function(prepared_data, title = NULL) {
 	plot(c(),
 		xlim = range(prepared_data$raw_data[,1]),
 		ylim = range(prepared_data$raw_data[,2]),
 		col  = palette(),
 		xlab = "x",
-		ylab = "y")
+		ylab = "y",
+		main = title)
 }
 
 # Places the data points from the prepared data onto the canvas.
