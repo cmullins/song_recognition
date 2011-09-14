@@ -18,7 +18,12 @@ height = 600) {
 		dir.create('plots')
 	}
 
-	png(file = sprintf("plots/%s", filename),
+#	postscript(file = sprintf("plots/%s.eps", filename),
+#		bg = 'white',
+#		width = width,
+#		height = height,
+#		paper = 'special')
+	png(file = sprintf("plots/%s.png", filename),
 		bg = 'white',
 		width = width,
 		height = height,
@@ -72,15 +77,15 @@ m_print(sprintf("\tCase 3 : %0.6f", 1-get_accuracy(case3_test_results)))
 
 m_print('Generating plots...')
 
-generate_plot('case1.png',
+generate_plot('case1',
 	function() {
 		create_scatter_plot(pd_train, case1_fn, "Case 1 Results")
 	})
-generate_plot('case2.png',
+generate_plot('case2',
 	function() {
 		create_scatter_plot(pd_train, case2_fn, "Case 2 Results")
 	})
-generate_plot('case3.png',
+generate_plot('case3',
 	function() {
 		create_scatter_plot(pd_train, case3_fn, "Case 3 Results")
 	})
