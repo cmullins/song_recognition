@@ -51,9 +51,9 @@ make_disc_function <- function(mean_, sigma_, prior = 1) {
 		# It'd be nice to do this as a matrix operation, but I don't see how to do that
 		# without ending up with an N x N matrix when we only need N values. One could
 		# just do the matrix multiplication by t(diff), and take the diagonal entries,
-		# but this results in very poor performance.
+		# but this results in very poor performance. Probably best to just do this one
+		# iteratively.
 		for (i in 1:nrow(X)) {
-			#v <- -0.5*(t(t1[i,]) %*% diff[i,])
 			v <- -0.5*drop(t1[i,] %*% diff[i,])
 			v <- v + const_t
 

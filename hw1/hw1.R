@@ -56,13 +56,12 @@ m_print(sprintf("\tCase 2 : %0.6f", 1-get_accuracy(case2_train_results)))
 m_print(sprintf("\tCase 3 : %0.6f", 1-get_accuracy(case3_train_results)))
 #######
 
-m_print("Testing...")
-
-m_print("Case 1: ")
+m_print("Running discriminant functions on test data...")
+m_print("Case 1 (linear): ")
 case1_test_results <- classify(case1_fn, pd_test, progress = TRUE)
-m_print("Case 2: ")
+m_print("Case 2 (linear): ")
 case2_test_results <- classify(case2_fn, pd_test, progress = TRUE)
-m_print("Case 3: ")
+m_print("Case 3 (quadratic): ")
 case3_test_results <- classify(case3_fn, pd_test, progress = TRUE)
 
 m_print("TEST ERROR:")
