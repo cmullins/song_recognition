@@ -36,14 +36,15 @@ make_disc_function <- function(mean_, sigma_, prior = 1) {
 	# Get sigma inverse
 	sigma_inv <- solve(l_sigma) 
 
-	# Pre-compute log of det term
-	logdet <- -0.5*log(det(sigma_inv))
+	# Pre-compute constant terms
+	const_t <- -0.5*log(det(sigma_inv)) + log(prior)
 
-	function (X) {
+	function (X, progress = FALSE) {
 		X      <- as.matrix(X)
 		scores <- matrix(0, nrow = nrow(X))
 		mu     <- matrix(l_mean, nrow = nrow(X), ncol = ncol(X), byrow = TRUE)
 		diff   <- X - mu
+		bsize  <- (nrow(X) / 10)
 
 		t1 <- diff %*% sigma_inv
 
@@ -52,11 +53,18 @@ make_disc_function <- function(mean_, sigma_, prior = 1) {
 		# just do the matrix multiplication by t(diff), and take the diagonal entries,
 		# but this results in very poor performance.
 		for (i in 1:nrow(X)) {
-			v <- -0.5*(t(t1[i,]) %*% diff[i,])
-			v <- v + logdet
-			v <- v + log(prior)
+			#v <- -0.5*(t(t1[i,]) %*% diff[i,])
+			v <- -0.5*drop(t1[i,] %*% diff[i,])
+			v <- v + const_t
 
 			scores[i,1] <- v
+
+			if (progress == TRUE && (i %% bsize) == 0) {
+				cat( sprintf(" %d%% ", i/nrow(X)*100) )
+			}
+		}
+		if (progress == TRUE) {
+			cat( "\n" )
 		}
 
 		scores #return
@@ -118,17 +126,25 @@ create_disc_fns <- function(prepared_data, sigma_fn) {
 
 # Classifies each row in data by annotation the index of the discriminant function
 # that returns the greatest value.
-classify <- function(disc_functions, prepared_data = NULL, raw_data = NULL) {
+classify <- function(disc_functions, prepared_data = NULL, raw_data = NULL, progress = FALSE) {
 	if (missing(raw_data)) {
 		data <- prepared_data$raw_data
 	} else {
 		data <- raw_data
 	}
 
-	disc_values <- matrix(disc_functions[[1]](data), ncol = 1)
+	p_print <- function(msg) {
+		if (progress == TRUE) {
+			cat(msg)
+		}
+	}
+
+	p_print("  | d_1:")
+	disc_values <- matrix(disc_functions[[1]](data, progress = progress), ncol = 1)
 
 	for (index in 2:length(disc_functions)) {
-		disc_values <- cbind(disc_values, disc_functions[[index]](data))
+		p_print(sprintf("  | d_%i:", index))
+		disc_values <- cbind(disc_values, disc_functions[[index]](data, progress = progress))
 	}
 
 	list(prepared_data = prepared_data,

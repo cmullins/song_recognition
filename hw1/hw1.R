@@ -58,9 +58,12 @@ m_print(sprintf("\tCase 3 : %0.6f", 1-get_accuracy(case3_train_results)))
 
 m_print("Testing...")
 
-case1_test_results <- classify(case1_fn, pd_test)
-case2_test_results <- classify(case2_fn, pd_test)
-case3_test_results <- classify(case3_fn, pd_test)
+m_print("Case 1: ")
+case1_test_results <- classify(case1_fn, pd_test, progress = TRUE)
+m_print("Case 2: ")
+case2_test_results <- classify(case2_fn, pd_test, progress = TRUE)
+m_print("Case 3: ")
+case3_test_results <- classify(case3_fn, pd_test, progress = TRUE)
 
 m_print("TEST ERROR:")
 m_print(sprintf("\tCase 1 : %0.6f", 1-get_accuracy(case1_test_results)))
