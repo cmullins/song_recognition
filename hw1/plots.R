@@ -13,7 +13,8 @@ settings <- list(
 	fg_palette = c("#007700", "#770000", "#000077"),
 
 	# Resolution / brush size for decision regions
-	dr_resolution = 0.01, dr_brush_size = 1)
+	dr_resolution = 0.01, dr_brush_size = 1
+)
 
 # Routines to generate plots
 

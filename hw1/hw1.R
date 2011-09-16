@@ -12,7 +12,7 @@ m_print <- function(msg) {
 
 generate_plot <- function(filename,
 plot_fn,
-width = 800,
+width = 600,
 height = 600) {
 	if (! file.exists('plots')) {
 		dir.create('plots')
