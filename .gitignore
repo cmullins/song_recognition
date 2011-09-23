@@ -2,3 +2,5 @@
 *.log
 *.toc
 *.aux
+./*.zip
+./*.tar.gz
