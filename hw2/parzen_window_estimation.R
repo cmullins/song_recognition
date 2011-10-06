@@ -2,77 +2,85 @@
 ###
 ### Defines functions for creating Parzen window estimations for a given dataset.
 
-# Loads data from a file and prepares it for use in the rest of the methods. 
-# Assumes that the last column in the data indicates the class of the row its
-# in.
-prepare_data <- function(file, sep = ',') {
-	raw_data <- read.table(file, sep = sep)
+source('common.R')
 
-	classes <- unique(raw_data[, ncol(raw_data)])
-	by_class <- list()
+# Gets a gaussian kernel function for use in parzen window pdf estimator. It
+# assumes you want the variance to be 1.
+get_unit_variance_gaussian_kernel_fn <- function(data) {
+	k     <- ncol(data)
+	mu    <- matrix(0, ncol = k, nrow = 1)
+	sigma <- diag(k)
 
-	for (class in classes) {
-		by_class[[class]] <- as.matrix(raw_data[raw_data[,ncol(raw_data)] == class,1:(ncol(raw_data)-1)])
-	}
-
-	list(
-		classes = classes,
-		raw_data = raw_data,
-		by_class = by_class)
+	get_gaussian_pdf(mu, sigma)
 }
 
-# Given a matrix of data, return a 0-mean Gaussian PDF with a diagonal covariance
-# matrix.
-get_gaussian_window_fn <- function(data) {
-	sigma     <- diag( sd(data) )
-	sigma_inv <- solve(sigma) 
-	const     <- 1 / ((2*pi)^(ncol(data) / 2) * sqrt(det(sigma)))
+# Gets a gaussian kernel function where the covariance matrix is I*sigma^2,
+# where sigma^2 is the mean of the variance across all dimensions of the
+# data
+get_mean_variance_gaussian_kernel_fn <- function(data) {
+	k      <- ncol(data)
+	mu     <- matrix(0, ncol = k, nrow = 1)
+	sigma  <- diag(k) * mean( sd(data) )
 
-	function(X) {
-		const * exp( -(1/2) * drop(t(X) %*% sigma_inv %*% X))
-	}
+	get_gaussian_pdf(mu, sigma)
 }
 
-# Get the delta function that simplifies the PDF we're after by assimilating the 
-# volume and height calculations.
-get_delta_fn <- function(data, window_width) {
-	h      <- window_width
-	n_dim  <- ncol(data)
-	V_inv  <- 1/((window_width)^(n_dim))
-	phi_fn <- get_gaussian_window_fn(data)
+# Gets a gaussian kernel function where the covariance matrix is a 
+# diagonal matrix. Sigma_ii = variance for dimension i in the data.
+get_diagonal_variance_gaussian_kernel_fn <- function(data) {
+	k      <- ncol(data)
+	mu     <- matrix(0, ncol = k, nrow = 1)
+	sigma  <- diag( sd(data) )
 
+	get_gaussian_pdf(mu, sigma)
+}
+
+# Get a gaussian kernel function where Sigma = cov(data). If cov(data) is
+# singular, this won't work. A possible workaround might be to add some
+# very small random values to data.
+get_gaussian_kernel_fn <- function(data) {
+	k      <- ncol(data)
+	mu     <- matrix(0, ncol = k, nrow = 1)
+	sigma  <- cov(data)
+
+	get_gaussian_pdf(mu, sigma)
+}
+
+# The naive kernel function that returns 1 if the point is in a hypercube
+# with unit length centered at the orgin, and 0 otherwise.
+get_delta_kernel_fn <- function(data) {
 	function(X) {
-		v <- V_inv * phi_fn(X / window_width)
-
-		if (v > 1) {
-#			browser()
+		if (length(X[abs(X) <= (1/2)]) == length(X)) {
+			return(1)
 		}
-
-		v
+		else {
+			return(0)
+		}
 	}
 }
 
-# Given prepared data, returns an "object" containing all the things necessary to
-# do Parzen window estimation.
-get_parzen_window_pdf_fn <- function(data_, window_width_) {
-	data <- data_
-	h    <- window_width_
-
-	delta_fn <- get_delta_fn(data, h)
+# Get a PDF estimator using the Parzen window estimation technique. The third
+# argument should be a function that returns a kernel function to use (e.g., a
+# Gaussian). Said function will be passed the data as the first (and only
+# parameter).
+get_parzen_window_pdf <- function(data, h, window_fn_builder) {
+	# Number of dimensions in the data
+	k <- ncol(data)
+	# Number of vectors in the sample
+	n <- nrow(data)
+	# Volume of the k-dimensional hypercube.
+	V <- (h^k)
+	# Get the window function, which can be constructed from the argument
+	# window_fn_builder
+	phi <- window_fn_builder(data)
 
 	function(X) {
-		n     <- nrow(data)
-		sum   <- 0
-		diffs <- matrix(X, nrow = nrow(data), ncol = ncol(data), byrow = TRUE) - data
+		# Compute the diff for each vector with a matrix operation. It ends up
+		# being faster this way.
+		sum  <- sum( apply(data, 1, function(xi) { phi((X - xi) / h) }) )
 
-		for (i in 1:n) {
-			if (delta_fn(diffs[i,]) > 1) {
-				print(sprintf("IT HAPPENED (%f): ", delta_fn(diffs[i,])))
-				print(diffs[i,])
-			}
-			sum <- sum + delta_fn(diffs[i,])
-		}
-
-		(sum / n)
+		# Divide by the volme after the fact. This prevents buffer underflow in
+		# some cases.
+		sum / (n * V)
 	}
 }
