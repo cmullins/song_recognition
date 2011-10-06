@@ -1,0 +1,175 @@
+% Save this file as assignment2.tex
+% Create plot1.eps, plot2.eps, plot3.eps in R, using function calls like
+%    dev.copy2eps(file="plot1.eps")
+% latex assignment2
+% latex assignment2  (do twice for figure references and contents)
+% dvips -o assignment2.ps -Ppdf assignment2.dvi
+% gv assignment2.ps  (to show the postscript file)
+% ps2pdf assignment2.ps    (to convert to PDF)
+% acroread assignment2.pdf (to show the PDF file)
+%  or
+% xpdf assignment2.pdf
+
+\documentclass{article}
+\usepackage{graphicx}
+\usepackage{url}
+\usepackage{geometry}
+\geometry{verbose,letterpaper,lmargin=1in,rmargin=1in,tmargin=1in,bmargin=1in}
+\usepackage{float}
+
+\usepackage{color}  % for color in lstset in listings
+\usepackage{listings}
+\lstset{language=R,showstringspaces=false}
+\lstdefinelanguage{RPlus}[]{R}{%
+morekeywords={acf,ar,arima,arima.sim,colMeans,colSums,is.na,is.null,%
+mapply,ms,na.rm,nlmin,replicate,row.names,rowMeans,rowSums,seasonal,%
+sys.time,system.time,ts.plot,which.max,which.min,solve},%
+deletekeywords={c},%
+otherkeywords={\%*\%,<-},%
+alsoletter={.\%},%
+alsoother={:_\$}} 
+
+% Alter some LaTeX defaults for better treatment of figures:
+    % See p.105 of "TeX Unbound" for suggested values.
+    % See pp. 199-200 of Lamport's "LaTeX" book for details.
+    %   General parameters, for ALL pages:
+    \renewcommand{\topfraction}{0.9}	% max fraction of floats at top
+    \renewcommand{\bottomfraction}{0.8}	% max fraction of floats at bottom
+    %   Parameters for TEXT pages (not float pages):
+    \setcounter{topnumber}{2}
+    \setcounter{bottomnumber}{2}
+    \setcounter{totalnumber}{4}     % 2 may work better
+    \setcounter{dbltopnumber}{2}    % for 2-column pages
+    \renewcommand{\dbltopfraction}{0.9}	% fit big float above 2-col. text
+    \renewcommand{\textfraction}{0.07}	% allow minimal text w. figs
+    %   Parameters for FLOAT pages (not text pages):
+    \renewcommand{\floatpagefraction}{0.7}	% require fuller float pages
+	% N.B.: floatpagefraction MUST be less than topfraction !!
+    \renewcommand{\dblfloatpagefraction}{0.7}	% require fuller float pages
+
+	% remember to use [htp] or [htpb] for placement
+
+
+\begin{document}
+
+\title{ICS 663: Homework 2 - Kernel Density Estimation}
+\author{Christopher Mullins}
+\maketitle
+
+\noindent\hrulefill
+\vspace{-5mm} %to remove some whitespace before "Contents"
+\tableofcontents
+\noindent\hrulefill
+
+\section{Introduction}
+
+Kernel density estimation is a technique for deriving a non-parametric estimate
+for the probability density function (PDF) of a dataset. This means it does not
+have any assumptions about the underlying distribution of the data it is applied
+to.  It works by considering hypercubic regions within the sample space centered
+around each point in the training data. These regions are determined by a
+parameter $h$ that specifies the length of an edge along the hypercube.
+
+The estimate, $\hat{p}(\mathbf{x})$, considers the distance of each point in the
+training sample from $\mathbf{x}$ and contributes some value to a mean. The
+actual calculation is:
+\[
+	\hat{p}(\mathbf{x}) = \frac{1}{nh^k} \sum_{i}^{n}
+\varphi\left(\frac{\mathbf{x}-\mathbf{x}_i}{h}\right). \]
+where $n$ is the number of elements in the training set, $\{ \mathbf{x}_i \}$ is
+the training set, and $\varphi(\mathbf{u})$ is a {\it kernel function} that
+gives some indication how likely it is that $\mathbf{x}$ is in the dataset
+$\hat{p}(\mathbf{x})$ describes for each $\mathbf{x}_i$ in the training set. The
+most naive choice for $\varphi$ yields $1$ when $\mathbf{x}$ is in the hypercube
+of length $h$ centered at $\mathbf{x}_i$ and $0$ otherwise. Mathematically, this
+is:
+\[
+	\varphi(\mathbf{u}) = \left\{
+		\begin{array}{lr}
+			1 & : \left| u_i \right| < \frac{1}{2} \qquad \forall 1 \leq i \leq n \\
+			0 & \mbox{ otherwise }
+		\end{array}
+	\right\}.
+\]
+Notice that $\varphi\left(\frac{\mathbf{x}-\mathbf{x}_i}{h}\right)=1$ if $x$ is
+within the hypercube of length $h$ centered at $\mathbf{x}_i$, and $0$
+otherwise.
+
+This is very rarely a good choice for $\varphi$, however. Its discontinuousness
+can cause problems, and it's probably not often reasonable to consider a point
+further away as good of a match as a point that's close. A common alternative is
+a 0-mean gaussian:
+\[
+	\varphi(\mathbf{u}) = \frac{1}{(2\pi)^{k/2}|\Sigma|^{1/2}} 
+		\exp\left( -\frac{1}{2}\left(\mathbf{x}^{T} \Sigma^{-1}
+		\mathbf{x}\right) \right).
+\]
+Here, $k$ is the number of dimensions in $\mathbf{x}$, and $\Sigma$ is $k \times
+k$ matrix that is (potentially) related to the variance of the training data.
+Obvious choices for $\Sigma$ are:
+\begin{enumerate}
+	\item $I_k$ (i.e., unit-variance)
+	\item $\sigma^2 I_k$, the mean of the variances for each dimension of data
+	\item \label{Sigma-diag}
+	$\mbox{diag}\left( \sigma_1^2, \sigma_2^2, \dots, \sigma_n^2 \right)$,
+	a diagonal matrix ${a_{ij}}$ where $a_{ii}=\sigma_i^2$ is the variance of
+	the $i$th dimension.
+	\item $\mbox{cov}\left( \{x_i\} \right)$
+\end{enumerate}
+In this assignment, multivariate gaussian with $\Sigma$ following case number
+\ref{Sigma-diag} is used.
+
+\section{Implementation}
+
+My implementation is again in R. There are three source files: \verb|common.R|,
+\verb|parzen_window_estimation.R|, and \verb|hw2.R|. \verb|common.R| includes
+some utility methods that I foresee using beyond this assignment.
+\verb|parzen_window_estimation.R| includes methods for creating PDF estimations
+for a provided dataset. \verb|hw2.R| is a script that seamlessly runs all of the
+requested tasks for this assignment.
+
+\subsection{Running}
+
+It should be as simple as running the \verb|hw2.R| script. To run from the
+commandline, one could use the command \verb|R --no-save --slave < hw2.R|. The
+output should be the table indicating error rates.
+
+\section{Results}
+
+Results for fixed values of $h$ are shown below. The same measurement is taken
+15 times to ensure a smooth result.
+
+\begin{center}
+\begin{tabular}{|c|c|c|c|}
+\hline
+	{\bf Run} & {\bf Width $= 0.01$} & {\bf Width $=0.5$} & {\bf Widith $=10$} \\
+\hline
+                   1 & 0.509804 & 0.019608 & 0.666667\\
+                   2 & 0.450980 & 0.019608 & 0.666667\\
+                   3 & 0.450980 & 0.058824 & 0.666667\\
+                   4 & 0.470588 & 0.039216 & 0.666667\\
+                   5 & 0.392157 & 0.039216 & 0.666667\\
+                   6 & 0.431373 & 0.039216 & 0.666667\\
+                   7 & 0.372549 & 0.000000 & 0.666667\\
+                   8 & 0.549020 & 0.039216 & 0.666667\\
+                   9 & 0.431373 & 0.019608 & 0.666667\\
+                  10 & 0.529412 & 0.000000 & 0.666667\\
+                  11 & 0.411765 & 0.019608 & 0.666667\\
+                  12 & 0.431373 & 0.058824 & 0.666667\\
+                  13 & 0.333333 & 0.019608 & 0.666667\\
+                  14 & 0.431373 & 0.019608 & 0.666667\\
+                  15 & 0.411765 & 0.019608 & 0.666667\\
+\hline
+	{\bf Mean}  & 0.440523 & 0.027451 & 0.666667 \\
+	{\bf Variance} &  0.057342 & 0.017848 & 0.000000 \\
+\hline
+\end{tabular}
+\end{center}
+
+These results highlight the fact that the choice of $h$ is very important to how
+successful the kernel density estimation technique is. If a window is too small,
+data that are even slightly distant from the training data will have near-0
+posterior probability. Too large, and there will be hardly any difference
+between points that are very far apart.
+
+\end{document}
