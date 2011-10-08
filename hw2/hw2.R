@@ -4,7 +4,7 @@
 ### HW2.
 
 source('common.R')
-source('parzen_window_estimation.R')
+source('kernel_density_estimation.R')
 
 # Settings specified in the report
 ################################################################################
@@ -19,11 +19,17 @@ settings <- list(
 	# Window widths to try
 	WINDOW_WIDTHS = c(0.01, 0.5, 10),
 
-	# Kernel function to use
+	# Kernel function to use.
+	# get_diagonal_variance_gaussian_kernel_fn gets a gaussian kernel function
+	# where the covariance matrix is diagonal with the entries being the
+	# variance of each dimension in the sample.
 	KERNEL_FN_BUILDER = get_diagonal_variance_gaussian_kernel_fn,
 
 	# Number of times to repeat the experiment
-	NUM_REPETITIONS = 15)
+	NUM_REPETITIONS = 15,
+	
+	# use 'ascii' for an ASCII table, use 'tex' for a LaTeX table.
+	OUTPUT_FORMAT = 'ascii')
 ################################################################################
 
 # Helper methods
@@ -77,7 +83,7 @@ run_experiment <- function(h, kernel_fn) {
 
 		train[[class]] <- split$train
 		test           <- rbind(test, cbind(split$test, class))
-		pdfs[[class]]  <- get_parzen_window_pdf(split$train, h, kernel_fn)
+		pdfs[[class]]  <- get_kernel_density_fn(split$train, h, kernel_fn)
 	}
 
 	# Strip the class column from the test data before we attempt to classify.
@@ -98,6 +104,7 @@ run_experiment <- function(h, kernel_fn) {
 ################################################################################
 
 # Read/parse data
+cat("Reading data...\n")
 data <- prepare_data(settings$DATA_FILE)
 
 # Run the experiment
@@ -116,39 +123,79 @@ for (run in 1:settings$NUM_REPETITIONS) {
 	printf("Done with run %d!", run)
 }
 
+means <- apply(results, 2, mean)
+variances <- sd(results)^2
+
 # Report results in the requested format.
-cat("================================================================================\n")
-cat(sprintf("%20s", "RUN"))
-for (h in settings$WINDOW_WIDTHS) {
-	cat(sprintf("%20s", sprintf("WIDTH = %.3f", h)))
-}
-cat("\n")
-cat('--------------------------------------------------------------------------------\n')
+if (settings$OUTPUT_FORMAT == 'ascii') {
+	cat("================================================================================\n")
+	cat(sprintf("%20s", "RUN"))
+	for (h in settings$WINDOW_WIDTHS) {
+		cat(sprintf("%20s", sprintf("WIDTH = %.3f", h)))
+	}
+	cat("\n")
+	cat('--------------------------------------------------------------------------------\n')
 
-for (i in 1:nrow(results)) {
-	cat(sprintf("%20d", i))
+	for (i in 1:nrow(results)) {
+		cat(sprintf("%20d", i))
 
+		for (k in 1:ncol(results)) {
+			cat(sprintf("%20s", sprintf("%f", results[i, k])))
+		}
+
+		cat("\n")
+	}
+	cat('--------------------------------------------------------------------------------\n')
+
+	
+	cat(sprintf("%20s", "MEAN"))
 	for (k in 1:ncol(results)) {
-		cat(sprintf("%20s", sprintf("%f", results[i, k])))
+		cat(sprintf("%20s", sprintf("%f", means[k])))
 	}
 
-	cat("\n")
+	cat('\n')
+
+	cat(sprintf("%20s", "VARIANCE"))
+	for (k in 1:ncol(results)) {
+		cat(sprintf("%20s", sprintf("%f", variances[k])))
+	}
+
+	cat('\n')
+	cat("================================================================================\n")
+} else if (settings$OUTPUT_FORMAT == 'tex') {
+	cat("\\begin{tabular}{|c", rep('|c', length(settings$WINDOW_WIDTHS)), "|}\n", sep = '')
+	cat("\\hline\n")
+	cat("{\\bf Run} ")
+	for (i in settings$WINDOW_WIDTHS) {
+		cat(sprintf("& {\\bf Width = %.3f} ", i))
+	}
+	cat("\\\\ \n")
+	cat("\\hline\n")
+	
+	for (i in 1:nrow(results)) {
+		cat(i)
+		
+		for (k in 1:ncol(results)) {
+			cat(sprintf(" & %f", results[i, k]))
+		}
+		
+		cat("\\\\ \n")
+	}
+	
+	cat("\\hline \n")
+	
+	cat("{\\bf Mean}")
+	for (k in 1:ncol(results)) {
+		cat(sprintf(" & %f", means[k]))
+	}
+	cat("\\\\ \n")
+	
+	cat("{\\bf Variance} ")
+	for (k in 1:ncol(results)) {
+		cat(sprintf(" & %f", variances[k]))
+	}
+	cat("\\\\ \n")
+	cat("\\hline \n")
+	
+	cat("\\end{tabular}")
 }
-cat('--------------------------------------------------------------------------------\n')
-
-means <- apply(results, 2, mean)
-cat(sprintf("%20s", "MEAN"))
-for (k in 1:ncol(results)) {
-	cat(sprintf("%20s", sprintf("%f", means[k])))
-}
-
-cat('\n')
-
-sdevs <- sd(results)
-cat(sprintf("%20s", "VARIANCE"))
-for (k in 1:ncol(results)) {
-	cat(sprintf("%20s", sprintf("%f", sdevs[k])))
-}
-
-cat('\n')
-cat("================================================================================\n")
