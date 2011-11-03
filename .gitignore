@@ -5,3 +5,4 @@
 ./*.zip
 ./*.tar.gz
 *.sw*
+.DS_Store
