@@ -6,15 +6,13 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.io.Serializable;
-import java.util.Set;
+import java.util.Collection;
 
 import org.sidoh.song_recognition.signature.LikenessComparator;
 import org.sidoh.song_recognition.signature.Signature;
-import org.sidoh.song_recognition.signature.SignatureExtractor;
 
 public abstract class SignatureDatabase<T extends Signature> implements Serializable {
 	private static final long serialVersionUID = 9042108607736960672L;
-	protected final LikenessComparator<T> comparator;
 	
 	public static class QueryResponse<T extends Signature> {
 		protected double confidence;
@@ -45,10 +43,6 @@ public abstract class SignatureDatabase<T extends Signature> implements Serializ
 		}
 	}
 	
-	public SignatureDatabase(LikenessComparator<T> comparator) {
-		this.comparator = comparator;
-	}
-	
 	/**
 	 * Add a song to the database.
 	 * 
@@ -72,7 +66,10 @@ public abstract class SignatureDatabase<T extends Signature> implements Serializ
 	 * @param query
 	 * @return
 	 */
-	protected QueryResponse<T> getResponse(Set<T> candidates, T query) {
+	protected static <T extends Signature> QueryResponse<T> getResponse(
+			LikenessComparator<T> comparator, 
+			Collection<? extends T> candidates, 
+			T query) {
 		double bestScore = Double.NEGATIVE_INFINITY;
 		T best = null;
 		

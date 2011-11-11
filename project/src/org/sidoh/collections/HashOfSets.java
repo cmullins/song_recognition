@@ -5,6 +5,14 @@ import java.util.Set;
 
 public class HashOfSets<K, V> extends DefaultingHashMap<K, Set<V>> {
 	private static final long serialVersionUID = -1286617433032205415L;
+	
+	public HashOfSets() {
+		super();
+	}
+	
+	public HashOfSets(int size) {
+		super(size);
+	}
 
 	@Override
 	protected Set<V> getDefaultValue() {

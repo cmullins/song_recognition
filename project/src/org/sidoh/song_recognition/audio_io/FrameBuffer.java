@@ -9,9 +9,9 @@ import java.io.IOException;
  * @author chris
  *
  */
-public interface FrameBuffer extends Iterable<double[]> {
+public abstract class FrameBuffer implements Iterable<double[]> {
 	public static class Builder {
-		private final int frameSize;
+		private int frameSize;
 		private double overlap;
 
 		private Builder(int frameSize) {
@@ -19,12 +19,13 @@ public interface FrameBuffer extends Iterable<double[]> {
 			overlap = 0d;
 		}
 		
-		public static Builder frameSize(int size) {
-			return new Builder(size);
-		}
-		
 		public Builder sampleOverlap(double rate) {
 			overlap = rate;
+			return this;
+		}
+		
+		public Builder frameSize(int size) {
+			this.frameSize = size;
 			return this;
 		}
 		
@@ -48,26 +49,37 @@ public interface FrameBuffer extends Iterable<double[]> {
 	 * 
 	 * @return
 	 */
-	public int getFrameSize();
+	public abstract int getFrameSize();
 	
 	/**
 	 * Returns the number of frames in this buffer.
 	 * 
 	 * @return
 	 */
-	public int getNumFrames();
+	public abstract int getNumFrames();
 	
 	/**
 	 * Returns sample rate
 	 * 
 	 * @return
 	 */
-	public double getSampleRate();
+	public abstract double getSampleRate();
 	
 	/**
 	 * Returns # of frames in a second.
 	 * 
 	 * @return
 	 */
-	public double getFramesPerSecond();
+	public abstract double getFramesPerSecond();
+	
+
+	/**
+	 * Create new builder with specified frame size
+	 * 
+	 * @param size
+	 * @return
+	 */
+	public static Builder frameSize(int size) {
+		return new Builder(size);
+	}
 }

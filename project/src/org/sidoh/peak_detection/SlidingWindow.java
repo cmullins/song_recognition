@@ -1,8 +1,8 @@
 package org.sidoh.peak_detection;
 
-import java.util.Deque;
 import java.util.Iterator;
-import java.util.LinkedList;
+
+import org.sidoh.collections.DoubleDeque;
 
 /**
  * this is a utility class that will get used in some of the peak detection
@@ -14,14 +14,14 @@ import java.util.LinkedList;
  *
  */
 public class SlidingWindow {
-	private Deque<Double> values;
+	private DoubleDeque values;
 	private final int maxSize;
-	private Double sum;
-	private Double sumOfSquares;
+	private double sum;
+	private double sumOfSquares;
 	
 	public SlidingWindow(int maxSize) {
 		this.maxSize = maxSize;
-		this.values  = new LinkedList<Double>();
+		this.values  = new DoubleDeque(maxSize);
 		
 		// yuck
 		this.sum          = 0d;
@@ -42,8 +42,8 @@ public class SlidingWindow {
 	 * 
 	 * @param value
 	 */
-	public Double pushValue(Double value) {
-		Double shifted = null;
+	public double pushValue(double value) {
+		double shifted = Double.NEGATIVE_INFINITY;
 		if (values.size() >= maxSize) {
 			double oldValue = values.removeFirst();
 			shifted = oldValue;
@@ -64,7 +64,7 @@ public class SlidingWindow {
 	 * 
 	 * @return
 	 */
-	public Double sum() {
+	public double sum() {
 		return sum;
 	}
 	
@@ -73,7 +73,7 @@ public class SlidingWindow {
 	 * 
 	 * @return
 	 */
-	public Double sumOfSquares() {
+	public double sumOfSquares() {
 		return sumOfSquares;
 	}
 	
@@ -82,7 +82,7 @@ public class SlidingWindow {
 	 * 
 	 * @return
 	 */
-	public Double mean() {
+	public double mean() {
 		return sum / values.size();
 	}
 	
@@ -91,7 +91,7 @@ public class SlidingWindow {
 	 * 
 	 * @return
 	 */
-	public Double standardDeviation() {
+	public double standardDeviation() {
 		return Math.sqrt(variance());
 	}
 	
@@ -100,11 +100,30 @@ public class SlidingWindow {
 	 * 
 	 * @return
 	 */
-	public Double variance() {
+	public double variance() {
 		int n = values.size();
 		return 
 			((n*sumOfSquares) - sum*sum)
 				/
 			(n * (n-1));
+	}
+
+	public static double mean(SlidingWindow left, SlidingWindow right) {
+		return (left.mean() + right.mean()) / 2;
+	}
+	
+	public static double sd(SlidingWindow left, SlidingWindow right) {
+		int n = left.maxSize+right.maxSize;
+		double sumOfSquares = (left.sumOfSquares() + right.sumOfSquares());
+		double sum = left.sum()+right.sum();
+		
+		return Math.sqrt(
+				(n*(sumOfSquares) - (sum*sum))
+					/
+				(n*(n-1)));
+	}
+	
+	public String toString() {
+		return "SlidingWindow[ size = " + values.size() + " ]";
 	}
 }

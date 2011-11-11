@@ -3,12 +3,19 @@ package org.sidoh.song_recognition.spectrogram;
 import java.util.ArrayList;
 
 public class InMemorySpectrogramStorage implements SpectrogramStorage {
-	private int maxTick;
+	public static class Builder extends SpectrogramStorage.Builder {
+		@Override
+		public SpectrogramStorage create(int maxFrequency, int numBins) {
+			return new InMemorySpectrogramStorage(maxFrequency, numBins);
+		}
+	}
+	
+	protected int maxTick;
 	private final int maxFrequency;
 	private final int bucketSize;
 	private final int numBuckets;
 	
-	private final ArrayList<double[]> ticks;
+	protected final ArrayList<double[]> ticks;
 	
 	public InMemorySpectrogramStorage(int maxFrequency, int numBuckets) {
 		this.maxFrequency = maxFrequency;
@@ -35,7 +42,7 @@ public class InMemorySpectrogramStorage implements SpectrogramStorage {
 	@Override
 	public double get(int tick, double frequency) {
 		if (ticks.size() <= tick) {
-			return 0;
+			throw new IllegalArgumentException("Trying to access tick that doesn't exit!");
 		}
 		return ticks.get(tick)[Math.min(freqToIndex(frequency), numBuckets-1)];
 	}
@@ -43,7 +50,7 @@ public class InMemorySpectrogramStorage implements SpectrogramStorage {
 	@Override
 	public double get(int tick, int bin) {
 		if (ticks.size() <= tick || numBuckets <= bin) {
-			return 0;
+			throw new IllegalArgumentException("Trying to access tick that doesn't exit!");
 		}
 		return ticks.get(tick)[bin];
 	}

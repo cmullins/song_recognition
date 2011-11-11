@@ -6,7 +6,7 @@ package org.sidoh.song_recognition.spectrogram;
  * 
  * @author chris
  */
-public class ConfigurableSpectrogram implements Spectrogram {
+public class ConfigurableSpectrogram extends Spectrogram {
 	
 	/**
 	 * Types of scales one can use

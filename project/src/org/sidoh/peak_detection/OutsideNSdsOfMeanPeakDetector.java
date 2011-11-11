@@ -5,7 +5,7 @@ import java.util.Iterator;
 import java.util.List;
 
 
-public class OutsideNSdsOfMeanPeakDetector extends PeakDetector {
+public class OutsideNSdsOfMeanPeakDetector extends StatelessPeakDetector {
 	
 	private final int k;
 	private final double numSds;
@@ -44,8 +44,8 @@ public class OutsideNSdsOfMeanPeakDetector extends PeakDetector {
 		
 		// Consider each point we can.
 		while (itr.hasNext()) {
-			double mean = mean(leftValues, rightValues);
-			double sd   = sd(leftValues, rightValues);
+			double mean = SlidingWindow.mean(leftValues, rightValues);
+			double sd   = SlidingWindow.sd(leftValues, rightValues);
 			
 			// Check if this thing is a peak.
 			if (Math.abs(xi - mean) > (numSds*sd)) {
@@ -59,20 +59,5 @@ public class OutsideNSdsOfMeanPeakDetector extends PeakDetector {
 		}
 		
 		return peaks;
-	}
-
-	protected double mean(SlidingWindow left, SlidingWindow right) {
-		return (left.mean() + right.mean()) / 2;
-	}
-	
-	protected double sd(SlidingWindow left, SlidingWindow right) {
-		int n = 2*k;
-		double sumOfSquares = (left.sumOfSquares() + right.sumOfSquares());
-		double sum = left.sum()+right.sum();
-		
-		return Math.sqrt(
-				(n*(sumOfSquares) - (sum*sum))
-					/
-				(n*(n-1)));
 	}
 }

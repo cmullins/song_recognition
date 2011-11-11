@@ -9,7 +9,7 @@ import java.util.Arrays;
  * @author chris
  *
  */
-public class SmoothedSpectrogram implements Spectrogram {
+public class SmoothedSpectrogram extends Spectrogram {
 	
 	private final int maxTick;
 	private final int numBins;

@@ -3,7 +3,7 @@ package org.sidoh.song_recognition.audio_io;
 import java.util.Arrays;
 import java.util.Iterator;
 
-public class OverlappingFrameBuffer implements FrameBuffer {
+public class OverlappingFrameBuffer extends FrameBuffer {
 	
 	private final FrameBuffer inner;
 	private final double overlap;

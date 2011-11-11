@@ -3,7 +3,7 @@ package org.sidoh.song_recognition.audio_io;
 import java.io.IOException;
 import java.util.Iterator;
 
-public class WavFrameBuffer implements FrameBuffer {
+public class WavFrameBuffer extends FrameBuffer {
 	
 	private final WavFile wav;
 	private final int windowSize;
@@ -25,7 +25,7 @@ public class WavFrameBuffer implements FrameBuffer {
 
 	@Override
 	public int getNumFrames() {
-		return (int)(wav.getNumFrames() / getFrameSize());
+		return (int)(wav.getNumFrames() / windowSize);
 	}
 
 	@Override

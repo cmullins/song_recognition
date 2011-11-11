@@ -133,6 +133,10 @@ public class ConstellationMap implements Serializable {
 
 		@Override
 		public int compare(Star o1, Star o2) {
+			if (o1 == null || o2 == null) {
+				throw new IllegalArgumentException("Can't compare null - " + o1 + " // " + o2 + "!");
+			}
+			
 			if (reverse) {
 				return o2.getIntensity().compareTo(o1.getIntensity());
 			}

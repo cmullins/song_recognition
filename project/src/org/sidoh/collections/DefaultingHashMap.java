@@ -4,6 +4,14 @@ import java.util.HashMap;
 
 public abstract class DefaultingHashMap<K,V> extends HashMap<K,V> {
 	private static final long serialVersionUID = 8428907711974132469L;
+	
+	public DefaultingHashMap() {
+		super();
+	}
+	
+	public DefaultingHashMap(int size) {
+		super(size);
+	}
 
 	/**
 	 * Should return the default value one wants to use.

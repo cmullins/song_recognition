@@ -11,7 +11,7 @@ import org.sidoh.song_recognition.signature.ConstellationMap.TimeStarComparator;
 import org.sidoh.song_recognition.spectrogram.Spectrogram;
 
 public class ConstellationMapComparator implements LikenessComparator<ConstellationMapSignature> {
-	
+	private static final long serialVersionUID = -1023025485046488094L;
 	private static final Comparator<Star> starSorter = new TimeStarComparator();
 	private final double matchThreshold;
 	

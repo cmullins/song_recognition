@@ -7,6 +7,21 @@ package org.sidoh.song_recognition.spectrogram;
  *
  */
 public interface SpectrogramStorage {
+	public abstract static class Builder {
+		public static Builder buffered(int bufferSize) {
+			return new BufferedSpectrogramStorage.Builder(bufferSize);
+		}
+		
+		public static Builder inMemory() {
+			return new InMemorySpectrogramStorage.Builder();
+		}
+		
+		public static Builder singleton() {
+			return new SingletonInMemorySpectrogramStorage.Builder();
+		}
+		
+		public abstract SpectrogramStorage create(int maxFrequency, int numBins);
+	}
 	/**
 	 * Store a value.
 	 * 

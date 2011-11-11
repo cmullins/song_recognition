@@ -50,7 +50,7 @@ public class PpmSpectrogramWriter implements SpectrogramWriter {
 		FrameBuffer buffer = new OverlappingFrameBuffer(
 				new WavFrameBuffer(wav, 512),
 				0.25);
-		Spectrogram spec = new FrameBufferSpectrogram(buffer);
+		Spectrogram spec = Spectrogram.inMemory().create(buffer);
 		SpectrogramWriter writer = new PpmSpectrogramWriter();
 		
 		writer.write(

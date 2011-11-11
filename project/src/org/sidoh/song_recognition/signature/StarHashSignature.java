@@ -10,9 +10,9 @@ import org.sidoh.song_recognition.spectrogram.Spectrogram;
 public class StarHashSignature implements Signature {
 	private static final long serialVersionUID = 1L;
 	private final ConstellationMap stars;
-	private final Map<Integer, Set<Star>> starHashes;
+	protected final Map<Integer, Set<Integer>> starHashes;
 	
-	public StarHashSignature(ConstellationMap stars, Map<Integer, Set<Star>> hashes) {
+	public StarHashSignature(ConstellationMap stars, Map<Integer, Set<Integer>> hashes) {
 		this.stars = stars;
 		this.starHashes = hashes;
 	}
@@ -21,7 +21,7 @@ public class StarHashSignature implements Signature {
 		return stars;
 	}
 
-	public Map<Integer, Set<Star>> getStarHashes() {
+	public Map<Integer, Set<Integer>> getStarHashes() {
 		return starHashes;
 	}
 	
