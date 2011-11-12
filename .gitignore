@@ -1,3 +1,5 @@
+*.eps
+*.png
 *.dvi
 *.log
 *.toc
