@@ -31,13 +31,8 @@ public class WavDatabaseBuilder<S extends Signature, E extends SignatureDatabase
 		FrameBuffer buffer = bufferBuilder.fromWavFile(wav);
 		S signature = extractor.extractSignature(specBuilder.create(buffer));
 		
-//		PgmSpectrogramConstellationWriter writer = new PgmSpectrogramConstellationWriter(Settings.CONSTELLATION_EXTRACTOR);
-//		OutputStream img = new FileOutputStream("/tmp/spectrograms/" + new File(filename).getName());
-//		writer.write(img, new ConfigurableSpectrogram(specBuilder.create(bufferBuilder.fromWavFile(WavFile.openWavFile(new File(filename))))).setContrast(1000));
-//		img.close();
-		
 		db.addSong(
-			new SongMetaData(filename, name, (int)(System.currentTimeMillis())),
+			new SongMetaData(new File(filename).getAbsolutePath(), name, (int)(System.currentTimeMillis())),
 			signature);
 	}
 }

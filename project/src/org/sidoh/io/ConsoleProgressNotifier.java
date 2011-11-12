@@ -27,7 +27,7 @@ public class ConsoleProgressNotifier extends ProgressNotifier {
 	public ConsoleProgressNotifier(int maxValue, String message, int maxUpdates) {
 		super(message, maxValue);
 		this.maxUpdates = maxUpdates;
-		this.updateRate = (maxValue / maxUpdates);
+		this.updateRate = Math.max(1, (maxValue / maxUpdates));
 		System.out.println(message);
 		done = false;
 	}

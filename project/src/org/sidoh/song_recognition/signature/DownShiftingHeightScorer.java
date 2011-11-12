@@ -47,7 +47,7 @@ public class DownShiftingHeightScorer extends HistogramScorer {
 		
 		double minInNth = pq.peekLast();
 		double max = hist.getMaxCount();
-		double den = Math.pow((max-minInNth), 2) / 25;
+		double den = Math.pow((max-minInNth), 2) / 2;
 		den = Math.max(1, den);
 		
 		return (1d - 1d/den);

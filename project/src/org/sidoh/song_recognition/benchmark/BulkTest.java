@@ -28,8 +28,8 @@ import org.sidoh.song_recognition.spectrogram.PgmSpectrogramConstellationWriter;
 import org.sidoh.song_recognition.spectrogram.Spectrogram;
 
 public class BulkTest {
-	private static final Pattern clipFilePart = Pattern.compile("/([^./-]*)[^.]+.wav");
-	private static final Pattern fullFilePart = Pattern.compile("/([^.]*).wav");
+	private static final Pattern clipFilePart = Pattern.compile("/?([^./-]*)[^.]+.wav");
+	private static final Pattern fullFilePart = Pattern.compile("/?([^./]*).wav");
 	
 	private static final ExecutorService fileWorkers = Executors.newFixedThreadPool(2);
 	
@@ -130,16 +130,19 @@ public class BulkTest {
 		if (response.song() != null) {
 			matchFound = true;
 			
-			Matcher matcher = clipFilePart.matcher(clipFile);
+			String baseFile = new File(clipFile).getName();
+			
+			Matcher matcher = clipFilePart.matcher(baseFile);
 			if (!matcher.find()) { 
-				throw new RuntimeException("should match (clip): " + clipFile);
+				throw new RuntimeException("should match (clip): " + baseFile);
 			}
-			Matcher fullMatcher = fullFilePart.matcher(response.song().getFilename());
+			Matcher fullMatcher = fullFilePart.matcher(response.song().getName());
 			if (!fullMatcher.find()) {
-				throw new RuntimeException("should match (clip): " + response.song().getFilename());
+				throw new RuntimeException("should match (full): " + response.song().getName());
 			}
 			
 			matchCorrect = matcher.group(1).equals(fullMatcher.group(1));
+			clipFile = baseFile;
 		}
 		
 		out.println("<tr>");
@@ -170,8 +173,8 @@ public class BulkTest {
 	}
 	
 	public static void main(String[] args) throws SQLException, IOException, WavFileException, InterruptedException {
-		if (args.length < 2) {
-			System.err.println("Syntax is: BulkTest <db_name> <wavfile1> <wavfile2> ... <wavfileN>");
+		if (args.length < 3) {
+			System.err.println("Syntax is: BulkTest <db_name> <report_dir> <wavfile1> [wavfile2] ... [wavfileN]");
 			System.exit(1);
 		}
 		
@@ -180,9 +183,12 @@ public class BulkTest {
 			System.exit(1);
 		}
 		
-		String reportDir = "report";
+		File reportDir = new File(args[1]);
+		if (! reportDir.exists()) {
+			reportDir.mkdirs();
+		}
 		
-		PrintStream out = new PrintStream(new FileOutputStream(reportDir + "/index.html"));
+		PrintStream out = new PrintStream(new FileOutputStream(new File(reportDir, "index.html").getAbsolutePath()));
 		printHeader(out);
 		
 		Settings settings = Settings.defaults();
@@ -204,7 +210,7 @@ public class BulkTest {
 				settings.getConstellationExtractor().quiet(), ProgressNotifier.nullNotifier());
 		HistogramScorer baseScorer = settings.getHistogramScorer();
 		
-		for (int i = 1; i < args.length; i++) {
+		for (int i = 2; i < args.length; i++) {
 			settings.setHistogramScorer(
 				new LoggingScorer(reportDir + "/" + i, baseScorer));
 			
@@ -212,7 +218,7 @@ public class BulkTest {
 			StarHashSignature sig = extractor.extractSignature(spec);
 			QueryResponse<StarHashSignature> response = db.findSong(sig);
 			
-			String songName = (response.song() == null ? "UNKNOWN" : response.song().getFilename());
+			String songName = (response.song() == null ? "UNKNOWN" : response.song().getName());
 			
 			printResult(out, args[i], response, i);
 			fileWorkers.execute(new SpectrogramWritingWorker(writer, spec, String.format("%s/%d/spectrogram", reportDir, i)));

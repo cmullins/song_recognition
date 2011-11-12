@@ -54,9 +54,22 @@ done
 
 cd $SAMPLES_DIR
 for sample in $(ls *.wav | grep "[0-9][0-9]*.wav"); do
+	sample_len=$(sox $sample -n stat 2>&1 | grep Length | awk '{printf("%d", $NF)}')
+
 	for noise in $(ls $NOISE_DIR/*.wav); do
+		noise_len=$(sox $noise -n stat 2>&1 | grep Length | awk '{printf("%d", $NF)}')
 		noise_name=$(basename "$noise" .wav)
 		new_sample_name=$SAMPLES_DIR/$(basename $sample .wav)-added-noise-$noise_name.wav
+
+		# If the noise is longer than the sample, trim the noise.
+		if [ $noise_len -gt $sample_len ]; then
+			noise_tmp=$(mktemp -t $(basename "$noise_name"))
+			mv $noise_tmp $noise_tmp.wav
+			noise_tmp=${noise_tmp}.wav
+
+			sox $noise $noise_tmp trim 0 $sample_len
+			noise=$noise_tmp
+		fi
 
 		if [ ! -f "$new_sample_name" ]; then
 			echo "Adding noise: $new_sample_name"

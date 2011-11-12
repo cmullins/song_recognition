@@ -45,17 +45,29 @@ get_perceptron <- function(X, learning_rate_fn, epoch_callback = NULL) {
 	while (misclass) {
 		misclass <- FALSE
 
+		# Accumulate all changes and update them at the end of the epoch.
+		delta <- matrix(0, ncol = n)
+
 		# Consider each sample in the input, and check if it's misclassified.
 		for (j in 1:nrow(X)) {
 			val <- a %*% X[j,1:n]
 
-			if ((val * X[j,n+1]) < 0) {
+			# Prevent silly nonsense from happening.
+			if (abs(val) > max(X)) {
+				val <- sign(val) * max(X)
+			}
+
+			if (sign(val) != sign(X[j,n+1])) {
 				misclass <- TRUE
 
 				# Update linear function
-				delta <- (X[j,n+1] - val) * X[j,1:n]
-				a <- a + eta*delta
+				delta <- delta + ((X[j,n+1] - val) * X[j,1:n])
 			}
+		}
+
+		# Update vector
+		if (misclass) {
+			a <- a + eta*delta
 		}
 
 		i <- i + 1

@@ -1,5 +1,6 @@
 package org.sidoh.song_recognition.database;
 
+import java.io.File;
 import java.io.IOException;
 import java.sql.SQLException;
 
@@ -28,7 +29,7 @@ public class BulkDbBuilder {
 
 		for (int i = 1; i < args.length; i++) {
 			System.out.println("Loading " + args[i] + "...");
-			dbBuilder.addSong(args[i], args[i]);
+			dbBuilder.addSong(new File(args[i]).getName(), args[i]);
 			System.out.println("--------------------------------------------------------------------------------------------------------");
 		}
 		
