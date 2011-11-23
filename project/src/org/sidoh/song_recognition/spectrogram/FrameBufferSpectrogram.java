@@ -52,7 +52,12 @@ public class FrameBufferSpectrogram extends Spectrogram {
 
 	@Override
 	public int getMaxTick() {
-		return (int)buffer.getNumFrames();
+		if (store.getMaxTick() == 0) {
+			return (int)buffer.getNumFrames();
+		}
+		else {
+			return store.getMaxTick();
+		}
 	}
 
 	@Override
@@ -103,7 +108,11 @@ public class FrameBufferSpectrogram extends Spectrogram {
 	private void compute() {
 		int tick = 0;
 		
-		ProgressNotifier tracker = progress.create("Creating spectrogram...", buffer.getNumFrames());
+		ProgressNotifier tracker = progress.create(
+				String.format("Creating spectrogram (length = %.1f seconds, sample rate = %.2f fps)", 
+						buffer.getNumFrames()/buffer.getFramesPerSecond(),
+						buffer.getFramesPerSecond()), 
+				buffer.getNumFrames());
 		
 		for (double[] frames : buffer) {
 			transform.transform(frames);

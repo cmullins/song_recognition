@@ -10,5 +10,9 @@ if [ -z "$dbname" ]; then
 	dbname=$DIR/../signatures
 fi
 
+if [ -e "$dbname.h2.db" ]; then
+	echo "WARNING: looks like the database already exists. you'll probably want to delete it."
+fi
+
 rm -rf "$dbname*"
 java -Xmx${MAX_HEAP_SIZE} -cp ${project_cp} org.sidoh.song_recognition.database.BulkDbBuilder $dbname $DIR/../songs/wavs/*

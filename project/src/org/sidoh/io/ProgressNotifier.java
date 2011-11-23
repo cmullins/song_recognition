@@ -2,6 +2,14 @@ package org.sidoh.io;
 
 public abstract class ProgressNotifier {
 	public abstract static class Builder {
+		public ChanneledProgressNotifier.Builder channeled(String channel) {
+			return new ChanneledProgressNotifier.Builder(this, channel);
+		}
+		
+		public IncrementingProgressNotifier.Builder incrementing() {
+			return new IncrementingProgressNotifier.Builder(this);
+		}
+		
 		public abstract ProgressNotifier create(String message, int maxValue);
 	}
 	

@@ -12,7 +12,7 @@ public class HeightScorer extends HistogramScorer {
 		}
 		double max = hist.getMaxCount();
 		
-		return (1d - (1d/max));
+		return (1d - 1d/((max*max)/100));
 	}
 
 }

@@ -45,6 +45,7 @@ public class ConsoleProgressNotifier extends ProgressNotifier {
 
 	@Override
 	public void complete() {
+		printProgress(maxValue);
 		System.out.println();
 		done = true;
 	}

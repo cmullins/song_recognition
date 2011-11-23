@@ -50,4 +50,15 @@ public class TestDoubleDeque {
 		}
 	}
 
+	@Test
+	public void testPeek() {
+		DoubleDeque dd = new DoubleDeque(100);
+		
+		for (int i = 0; i < 100; i++) {
+			dd.addLast(i);
+		}
+		
+		assert(dd.peekFirst() == 0d);
+		assert(dd.peekLast() == 99d);
+	}
 }

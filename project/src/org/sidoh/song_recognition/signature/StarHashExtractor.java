@@ -36,7 +36,7 @@ public class StarHashExtractor implements SpectrogramSignatureExtractor<StarHash
 		List<Star> stars = new ArrayList<Star>(starSig.getConstellationMap().getStars());
 		Collections.sort(stars, new TimeStarComparator());
 		
-		ProgressNotifier notifier = progress.create("Extracting hash values...",stars.size());
+		ProgressNotifier notifier = progress.create("Extracting hash values...", stars.size());
 		int i = 0;
 		
 		Set<Region> regions = new HashSet<Region>();
@@ -68,6 +68,6 @@ public class StarHashExtractor implements SpectrogramSignatureExtractor<StarHash
 	}
 
 	protected int getTime(Star s) {
-		return (int)Math.floor(s.getTime() * timeResolution);
+		return (int)Math.floor(s.getTick());
 	}
 }

@@ -13,6 +13,9 @@ import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.sidoh.collections.IndexingDictionary;
+import org.sidoh.io.ChanneledProgressNotifier;
+import org.sidoh.io.IncrementingProgressNotifier;
 import org.sidoh.io.ProgressNotifier;
 import org.sidoh.song_recognition.audio_io.FrameBuffer;
 import org.sidoh.song_recognition.audio_io.WavFileException;
@@ -28,7 +31,7 @@ import org.sidoh.song_recognition.spectrogram.PgmSpectrogramConstellationWriter;
 import org.sidoh.song_recognition.spectrogram.Spectrogram;
 
 public class BulkTest {
-	private static final Pattern clipFilePart = Pattern.compile("/?([^./-]*)[^.]+.wav");
+	private static final Pattern clipFilePart = Pattern.compile("^([a-z0-9_]+)-([0-9]+)-to-([0-9]+)(-added-noise-([a-z0-9_]+))?.wav$");
 	private static final Pattern fullFilePart = Pattern.compile("/?([^./]*).wav");
 	
 	private static final ExecutorService fileWorkers = Executors.newFixedThreadPool(2);
@@ -49,17 +52,42 @@ public class BulkTest {
 		out.println("</table>");
 	}
 	
+	private static class NoisyNotificationToggle implements Runnable {
+		private final String channel;
+		public NoisyNotificationToggle(String channel) {
+			this.channel = channel;
+			
+		}
+		@Override
+		public void run() {
+			while (true) {
+				try {
+					System.in.read();
+				} catch (IOException e) {
+					throw new RuntimeException(e);
+				}
+				
+				ChanneledProgressNotifier.toggleChannel(channel);
+				
+				if (Thread.interrupted()) {
+					break;
+				}
+			}
+		}
+	}
+	
 	private static class SpectrogramWritingWorker implements Runnable {
 		
 		private final PgmSpectrogramConstellationWriter writer;
 		private final Spectrogram spec;
 		private final String file;
+		private final IncrementingProgressNotifier notifier;
 
-		public SpectrogramWritingWorker(PgmSpectrogramConstellationWriter writer, Spectrogram spec, String file) {
+		public SpectrogramWritingWorker(PgmSpectrogramConstellationWriter writer, Spectrogram spec, String file, IncrementingProgressNotifier notifier) {
 			this.writer = writer;
 			this.spec = spec;
 			this.file = file;
-			
+			this.notifier = notifier;
 		}
 
 		@Override
@@ -81,6 +109,7 @@ public class BulkTest {
 							png
 						});
 				new File(pgm).deleteOnExit();
+				notifier.update();
 			}
 			catch (Exception e) {
 				throw new RuntimeException(e);
@@ -92,10 +121,11 @@ public class BulkTest {
 	private static class HistogramWritingWorker implements Runnable {
 		
 		private final String directory;
+		private final IncrementingProgressNotifier notifier;
 
-		public HistogramWritingWorker(String directory) {
+		public HistogramWritingWorker(String directory, IncrementingProgressNotifier notifier) {
 			this.directory = directory;
-			
+			this.notifier = notifier;
 		}
 
 		@Override
@@ -108,7 +138,7 @@ public class BulkTest {
 						String fn = f.getAbsolutePath();
 						String out = fn + ".png";
 						String script = String.format(
-								"png(filename=\"%s\",width=1000,height=400);d<-read.table(\"%s\");hist(d[,1],breaks=400);dev.off();",
+								"png(filename=\"%s\",width=1500,height=400);d<-read.table(\"%s\");barplot(d[,2]);dev.off();",
 								out, fn);
 						
 						Process exec = Runtime.getRuntime().exec("R --vanilla");
@@ -117,10 +147,57 @@ public class BulkTest {
 						write.close();
 					}
 				}
+				
+				notifier.update();
 			}
 			catch (Exception e) { throw new RuntimeException(e); }
 		}
 		
+	}
+	
+	private static final IndexingDictionary<String> songIds = new IndexingDictionary<String>();
+	
+	private static void printRawResult(PrintStream out, String clipFile, QueryResponse<StarHashSignature> response) {
+		String baseFile = new File(clipFile).getName();
+		Matcher clipMatcher = clipFilePart.matcher(baseFile);
+		if (!clipMatcher.matches()) {
+			throw new RuntimeException("filename should match: " + baseFile);
+		}
+		
+		String songName = clipMatcher.group(1);
+		int clipStart   = Integer.parseInt(clipMatcher.group(2));
+		int clipEnd     = Integer.parseInt(clipMatcher.group(3));
+		String noise    = "NONE";
+		
+		if (clipMatcher.group(5) != null && !clipMatcher.group(5).isEmpty()) {
+			noise = clipMatcher.group(5);
+		}
+		
+		boolean matchFound = false;
+		boolean matchCorrect = false;
+		int matchId = -1;
+		int clipSongId = songIds.offer(songName);
+		
+		if (response.song() != null) {
+			matchFound = true;
+			
+			Matcher fullMatcher = fullFilePart.matcher(response.song().getName());
+			if (!fullMatcher.find()) {
+				throw new RuntimeException("should match (full): " + response.song().getName());
+			}
+			
+			matchCorrect = clipMatcher.group(1).equals(fullMatcher.group(1));
+			
+			matchId = songIds.offer(fullMatcher.group(1));
+		}
+		
+		out.printf("%d,%d,%d,%s,%.5f,%d\n",
+			clipSongId,
+			matchId,
+			(clipEnd - clipStart),
+			noise,
+			response.confidence(),
+			(matchFound && matchCorrect ? 1 : 0));
 	}
 	
 	private static void printResult(PrintStream out, String clipFile, QueryResponse<StarHashSignature> response, int num) {
@@ -159,13 +236,7 @@ public class BulkTest {
 		out.println("</td>");
 		out.printf("<td>%s</td>", clipFile);
 		
-		if (matchFound) {
-			out.printf("<td><a href='%d/%s.png'>%f</a></td>", num, String.valueOf(response.confidence()), response.confidence());
-		}
-		else {
-			out.println("<td>-</td>");
-			out.println("<td>-</td>");
-		}
+		out.printf("<td><a href='%d/%s.png'>%f</a></td>", num, String.valueOf(response.confidence()), response.confidence());
 		
 		out.printf("<td><a href='%d/spectrogram.png'>spectrogram</a></td>", num);
 		out.println();
@@ -189,14 +260,29 @@ public class BulkTest {
 		}
 		
 		PrintStream out = new PrintStream(new FileOutputStream(new File(reportDir, "index.html").getAbsolutePath()));
+		PrintStream rawOut = new PrintStream(new FileOutputStream(new File(reportDir, "raw.txt").getAbsolutePath()));
 		printHeader(out);
+		
+		ProgressNotifier.Builder noisyNotifier = ProgressNotifier
+			.consoleNotifier(50)
+			.channeled("noisy_updates");
+		Thread toggle = new Thread(new NoisyNotificationToggle("noisy_updates"));
+		toggle.start();
 		
 		Settings settings = Settings.defaults();
 		settings
-			.setProgressNotifer(ProgressNotifier.nullNotifier()) //ssh
+			.setProgressNotifer(noisyNotifier)
+			.setSpectrogramBuilder(Spectrogram.inMemory())       //need separate memory for each spectrogram
 			;
 		ProgressNotifier notifier = ProgressNotifier.consoleNotifier(100)
 			.create("Generating report...", args.length-1);
+		
+		IncrementingProgressNotifier workerNotifier = 
+			ProgressNotifier
+				.consoleNotifier(100)
+				.channeled("worker_tasks")
+				.incrementing()
+			.create("Waiting for workers to finish...", 2*(args.length - 1));
 		
 		HashSignatureDatabase db = new HashSignatureDatabase(
 				H2Helper.getConnection(args[0]),
@@ -221,8 +307,10 @@ public class BulkTest {
 			String songName = (response.song() == null ? "UNKNOWN" : response.song().getName());
 			
 			printResult(out, args[i], response, i);
-			fileWorkers.execute(new SpectrogramWritingWorker(writer, spec, String.format("%s/%d/spectrogram", reportDir, i)));
-			fileWorkers.execute(new HistogramWritingWorker(String.format("%s/%d", reportDir, i)));
+			printRawResult(rawOut, args[i], response);
+			
+			fileWorkers.execute(new SpectrogramWritingWorker(writer, spec, String.format("%s/%d/spectrogram", reportDir, i), workerNotifier));
+			fileWorkers.execute(new HistogramWritingWorker(String.format("%s/%d", reportDir, i), workerNotifier));
 			
 			notifier.update(i);
 		}
@@ -232,5 +320,7 @@ public class BulkTest {
 		
 		fileWorkers.shutdown();
 		System.out.println("Waiting for file workers to complete...");
+		toggle.interrupt();
+		ChanneledProgressNotifier.enableChannel("worker_tasks");
 	}
 }

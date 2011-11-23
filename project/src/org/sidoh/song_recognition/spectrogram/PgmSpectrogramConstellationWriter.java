@@ -22,6 +22,8 @@ public class PgmSpectrogramConstellationWriter extends PpmSpectrogramWriter {
 	private static final byte[] PGM_MAGIC_NUM = "P6\n".getBytes();
 	private static final byte[] STAR_COLOR = {(byte)0xFF, 0, 0};
 	private static final byte[] SECOND_BARRIER_COLOR = {0, (byte)0xFF, 0};
+	// Color to use every 30 seconds
+	private static final byte[] SECOND_BARRIER2_COLOR = {0, 0, (byte)0xFF};
 	private final ConstellationMapExtractor extractor;
 	private final int width;
 	private final int height;
@@ -59,7 +61,10 @@ public class PgmSpectrogramConstellationWriter extends PpmSpectrogramWriter {
 			double frequency = bins[j];
 			
 			for (int i = 0; i < spec.getMaxTick(); i++) {
-				if (starRegions.isSecondBarrier(i)) {
+				if ((starRegions.getSecond(i) % 30) == 0 && starRegions.isSecondBarrier(i)) {
+					out.write(SECOND_BARRIER2_COLOR);
+				}
+				else if (starRegions.isSecondBarrier(i)) {
 					out.write(SECOND_BARRIER_COLOR);
 				}
 				else if (starRegions.isStar(i, frequency)) {
@@ -113,6 +118,10 @@ public class PgmSpectrogramConstellationWriter extends PpmSpectrogramWriter {
 				}
 				starsBySecond.get(second).add(star);
 			}
+		}
+		
+		public int getSecond(int tick) {
+			return (int)Math.floor(spec.tickToSeconds(tick));
 		}
 		
 		public boolean isSecondBarrier(int tick) {

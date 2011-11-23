@@ -30,13 +30,11 @@ const_learning_rate_fn <- function(val) {
 #     (as a boolean).
 get_perceptron <- function(X, learning_rate_fn, epoch_callback = NULL) {
 	X <- as.matrix(X)
-
-	# Introduce a bias term
-	X <- cbind(X[,1:(ncol(X)-1)], 1, X[,ncol(X)])
 	n <- ncol(X)-1
 
 	# Initialize stuff.
-	a <- t(as.matrix(rnorm(n, 0, 1)))
+	a <- t(as.matrix(runif(n, min(X), max(X))))
+
 	i <- 0
 	eta <- learning_rate_fn(i)
 	misclass <- TRUE
@@ -52,16 +50,11 @@ get_perceptron <- function(X, learning_rate_fn, epoch_callback = NULL) {
 		for (j in 1:nrow(X)) {
 			val <- a %*% X[j,1:n]
 
-			# Prevent silly nonsense from happening.
-			if (abs(val) > max(X)) {
-				val <- sign(val) * max(X)
-			}
-
 			if (sign(val) != sign(X[j,n+1])) {
 				misclass <- TRUE
 
 				# Update linear function
-				delta <- delta + ((X[j,n+1] - val) * X[j,1:n])
+				delta <- delta + X[j,1:n]*X[j,n+1]
 			}
 		}
 

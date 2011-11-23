@@ -2,6 +2,8 @@ package org.sidoh.peak_detection;
 
 import java.util.Iterator;
 
+import org.sidoh.collections.AscendingMinimaWindow;
+import org.sidoh.collections.CountingMap;
 import org.sidoh.collections.DoubleDeque;
 
 /**
@@ -18,14 +20,27 @@ public class SlidingWindow {
 	private final int maxSize;
 	private double sum;
 	private double sumOfSquares;
+	private double deltaSum;
+	private double deltaRSum;
+	
+	private AscendingMinimaWindow<Double> minTracker;
+	private AscendingMinimaWindow<Double> maxTracker;
 	
 	public SlidingWindow(int maxSize) {
 		this.maxSize = maxSize;
 		this.values  = new DoubleDeque(maxSize);
 		
+		AscendingMinimaWindow.Builder<Double> winBuilder = AscendingMinimaWindow
+				.<Double>withNaturalOrdering(maxSize);
+		
+		this.minTracker = winBuilder.create();
+		this.maxTracker = winBuilder.reverseOrder().create();
+		
 		// yuck
 		this.sum          = 0d;
 		this.sumOfSquares = 0d;
+		this.deltaSum     = 0d;
+		this.deltaRSum    = 0d;
 	}
 	
 	public SlidingWindow(int maxSize, Iterable<Double> initialElements) {
@@ -46,15 +61,24 @@ public class SlidingWindow {
 		double shifted = Double.NEGATIVE_INFINITY;
 		if (values.size() >= maxSize) {
 			double oldValue = values.removeFirst();
+			
 			shifted = oldValue;
 		
 			sum -= oldValue;
 			sumOfSquares -= oldValue*oldValue;
+			deltaSum -= (values.peekFirst() - oldValue);
 		}
 		
 		sum += value;
 		sumOfSquares += value*value;
+		
+		if (values.size() > 0) {
+			deltaSum += (value - values.peekLast());
+		}
+		
 		values.addLast(value);
+		minTracker.offer(value);
+		maxTracker.offer(value);
 		
 		return shifted;
 	}
@@ -87,12 +111,29 @@ public class SlidingWindow {
 	}
 	
 	/**
+	 * Get the mean delta value of this window
+	 * 
+	 * @return
+	 */
+	public double meanDelta() {
+		return (deltaSum - deltaRSum) / (values.size() - 1);
+	}
+	
+	/**
 	 * Get the standard deviation of values in this window.
 	 * 
 	 * @return
 	 */
 	public double standardDeviation() {
 		return Math.sqrt(variance());
+	}
+	
+	public double min() {
+		return minTracker.getMinimum();
+	}
+	
+	public double max() {
+		return maxTracker.getMinimum();
 	}
 	
 	/**
@@ -124,6 +165,6 @@ public class SlidingWindow {
 	}
 	
 	public String toString() {
-		return "SlidingWindow[ size = " + values.size() + " ]";
+		return values.toString();
 	}
 }

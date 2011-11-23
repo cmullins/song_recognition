@@ -8,6 +8,8 @@ public class OverlappingFrameBuffer extends FrameBuffer {
 	private final FrameBuffer inner;
 	private final double overlap;
 	private final int overlapSize;
+	private final int numFrames;
+	private final double fps;
 
 	public OverlappingFrameBuffer(FrameBuffer inner, double overlap) {
 		if (overlap <= 0 || overlap >= 1) {
@@ -17,6 +19,13 @@ public class OverlappingFrameBuffer extends FrameBuffer {
 		this.overlap = overlap;
 		this.inner = inner;	
 		this.overlapSize = (int)(overlap * inner.getFrameSize());
+		
+		numFrames = (int)Math.floor((inner.getNumFrames() * inner.getFrameSize()) / (inner.getFrameSize() - overlapSize));
+		
+		double oldFps = inner.getFramesPerSecond();
+		double growth = (numFrames / (double)inner.getNumFrames());
+		
+		fps = (oldFps * growth);
 	}
 
 	@Override
@@ -31,7 +40,7 @@ public class OverlappingFrameBuffer extends FrameBuffer {
 	
 	@Override
 	public int getNumFrames() {
-		return (int)Math.ceil(inner.getNumFrames() * (1.0d + overlap));
+		return numFrames;
 	}
 
 	@Override
@@ -41,7 +50,7 @@ public class OverlappingFrameBuffer extends FrameBuffer {
 
 	@Override
 	public double getFramesPerSecond() {
-		return (getSampleRate() / (getFrameSize() * (1.0 - overlap)));
+		return fps;
 	}
 	
 	private final class InnerIterator implements Iterator<double[]> {
@@ -51,12 +60,14 @@ public class OverlappingFrameBuffer extends FrameBuffer {
 		private double[] pBuffer;
 		private int innerBufferIndex;
 		private final Iterator<double[]> innerItr;
+		private int i;
 		
 		public InnerIterator() {
 			innerBufferIndex = getFrameSize();
 			buffer = new double[getFrameSize()];
 			pBuffer = new double[getFrameSize()];
 			innerItr = inner.iterator();
+			i = 0;
 		}
 
 		@Override
@@ -79,7 +90,7 @@ public class OverlappingFrameBuffer extends FrameBuffer {
 				buffer[i] = nextValue();
 			}
 			
-			pBuffer = Arrays.copyOf(buffer, buffer.length);
+			System.arraycopy(buffer, 0, pBuffer, 0, buffer.length);
 			return buffer;
 		}
 

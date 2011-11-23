@@ -5,6 +5,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
@@ -126,7 +127,7 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 			
 			ProgressNotifier notifier = progress.create("Loading hash offsets into memory...", count);
 			
-			this.cache = new HashOfSets<Integer, Pair<Integer, Integer>>((int)Math.floor(0.75*count));
+			this.cache = new HashOfSets<Integer, Pair<Integer, Integer>>((int)Math.floor(2*count));
 			
 			ResultSet hashes = db.prepareStatement("SELECT * FROM song_hashes").executeQuery();
 			int i = 0;
@@ -145,7 +146,7 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 			int i = 1;
 			
 			for (Integer hash : sig.getStarHashes().keySet()) {
-				songs.addHashes(hash, cache.get(hash));
+				songs.addHashes(hash, getMatchingHashes(hash));
 				
 				notifier.update(i++);
 			}
@@ -170,6 +171,55 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 			ResultSet results = getLastIdStatement.executeQuery();
 			results.next();
 			return results.getInt(1);
+		}
+		
+		protected Iterable<Pair<Integer, Integer>> getMatchingHashes(int hashValue) throws SQLException {
+			if (cache.containsKey(hashValue)) {
+				return cache.get(hashValue);
+			}
+			else {
+				findHashesStatement.setInt(1, hashValue);
+				return new HashResultIterator(findHashesStatement.executeQuery()); 
+			}
+		}
+		
+		protected static class HashResultIterator implements Iterable<Pair<Integer, Integer>>, Iterator<Pair<Integer,Integer>> {
+			private final ResultSet results;
+
+			public HashResultIterator(ResultSet results) {
+				this.results = results;
+				
+			}
+
+			@Override
+			public boolean hasNext() {
+				try {
+					return results.next();
+				}
+				catch (SQLException e) {
+					throw new RuntimeException(e);
+				}
+			}
+
+			@Override
+			public Pair<Integer, Integer> next() {
+				try {
+					return Pair.create(results.getInt("song_id"), results.getInt("time_offset"));
+				} catch (SQLException e) {
+					throw new RuntimeException(e);
+				}
+			}
+
+			@Override
+			public void remove() {
+				throw new UnsupportedOperationException();
+			}
+
+			@Override
+			public Iterator<Pair<Integer, Integer>> iterator() {
+				return this;
+			}
+			
 		}
 		
 		protected static class ReconstructingMap extends DefaultingHashMap<Integer, ReconstructedStarHashSignature> {
@@ -242,7 +292,7 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 			Map<Integer, ReconstructedStarHashSignature> offsetsByHashes = dbHelper.getOffsetsByHashes(signature);
 			QueryResponse<StarHashSignature> response = getResponse(settings.getStarHashComparator(), offsetsByHashes.values(), signature);
 			ReconstructedStarHashSignature sig = (ReconstructedStarHashSignature) response.signature();
-
+			
 			if (sig != null) {
 				response.setSong(dbHelper.getSongById(sig.getId()));
 			}

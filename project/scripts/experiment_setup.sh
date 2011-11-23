@@ -17,6 +17,7 @@ NOISE_DIR=$DIR/../songs/noise
 ##### Experiment settings
 
 # Which script to use to downconvert samples (not training files)
+#DOWNCONVERT_SCRIPT=echo
 DOWNCONVERT_SCRIPT=$DIR/gsm_downconvert.sh
 
 # Start locations to use for samples
@@ -29,7 +30,7 @@ SAMPLE_LENGTHS="15 20 30"
 
 cd $MP3S_DIR
 find . -name "*.mp3" -print0 | while read -d $'\0' mp3; do
-	wavname=$WAVS_DIR/$(basename "$mp3" .mp3 | tr '[A-Z]' '[a-z]' | sed 's/[^a-z0-9]/_/g' | sed 's/__*/_/g').wav
+	wavname=$WAVS_DIR/$(basename "$mp3" .mp3 | sed 's/^[^a-zA-Z]*//g' | tr '[A-Z]' '[a-z]' | sed 's/[^a-z0-9]/_/g' | sed 's/__*/_/g' | sed 's/^_*//g' | sed 's/_*$//g').wav
 
 	if [ ! -f $wavname ]; then
 		echo "Converting to WAV: $mp3..."

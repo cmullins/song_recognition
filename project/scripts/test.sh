@@ -16,5 +16,11 @@ if [ -z "$report" ]; then
 	report=$DIR/../report
 fi
 
+test_dir=$3
+if [ -z "$test_dir" ]; then
+	test_dir=$DIR/../songs/samples
+	echo "No test dir specified using default: $test_dir"
+fi
+
 rm -rf $report
-java -Xmx${MAX_HEAP_SIZE} -cp ${project_cp} org.sidoh.song_recognition.benchmark.BulkTest $dbname $report $DIR/../songs/samples/*
+java -Xmx${MAX_HEAP_SIZE} -cp ${project_cp} org.sidoh.song_recognition.benchmark.BulkTest $dbname $report $test_dir/*

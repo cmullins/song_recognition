@@ -30,7 +30,7 @@ public class StarHashComparator implements LikenessComparator<StarHashSignature>
 			
 				for (Integer offset1 : offsets2) {
 					for (Integer offset2 : offsets1) {
-						offsets.addValue(offset1 - offset2);
+						offsets.addValue(offset2 - offset1);
 					}
 				}
 			}

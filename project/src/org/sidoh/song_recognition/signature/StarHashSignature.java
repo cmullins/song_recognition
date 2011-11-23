@@ -26,12 +26,17 @@ public class StarHashSignature implements Signature {
 	}
 	
 	public static Integer computeHash(int time1, int time2, int freqBin1, int freqBin2, Spectrogram spec) {
-		return computeHash(spec.tickToSeconds(time1), spec.tickToSeconds(time2), freqBin1, freqBin2);
+		return computeHash(Math.abs(time1-time2), freqBin1, freqBin2);
+		//return computeHash(spec.tickToSeconds(time1), spec.tickToSeconds(time2), freqBin1, freqBin2);
 	}
 	
 	public static Integer computeHash(double time1, double time2, int freqBin1, int freqBin2) {
-		int timeDelta = (int)Math.abs(Math.floor(time1*100000) - Math.floor(time2*100000));
+		int timeDelta = (int)Math.abs(Math.floor(time1*1e6) - Math.floor(time2*1e6));
 
+		return computeHash(timeDelta, freqBin1, freqBin2);
+	}
+	
+	public static Integer computeHash(int timeDelta, int freqBin1, int freqBin2) {
 		return (((timeDelta & 0x3FFFF) << 20) | ((freqBin1 & 0x3FF) << 10) | (freqBin2 & 0x3FF));
 	}
 

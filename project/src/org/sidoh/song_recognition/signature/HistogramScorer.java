@@ -24,6 +24,10 @@ public abstract class HistogramScorer implements Serializable {
 		return new HeightScorer();
 	}
 	
+	public static HistogramScorer heightProbabilityScorer() {
+		return new HeightProbabilityScorer();
+	}
+	
 	public static HistogramScorer sdsFromMeanAndHeight(int heightSig) {
 		return new SdsFromMeanAndHeightScorer(heightSig);
 	}
@@ -42,5 +46,9 @@ public abstract class HistogramScorer implements Serializable {
 	
 	public static HistogramScorer downshiftingHeightScorer(double percentile, boolean defaultTo2) {
 		return new DownShiftingHeightScorer(percentile, defaultTo2);
+	}
+	
+	public static HistogramScorer entropyScorer() {
+		return new EntropyScorer();
 	}
 }

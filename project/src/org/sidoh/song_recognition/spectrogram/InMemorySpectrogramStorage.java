@@ -41,16 +41,15 @@ public class InMemorySpectrogramStorage implements SpectrogramStorage {
 
 	@Override
 	public double get(int tick, double frequency) {
-		if (ticks.size() <= tick) {
-			throw new IllegalArgumentException("Trying to access tick that doesn't exit!");
-		}
-		return ticks.get(tick)[Math.min(freqToIndex(frequency), numBuckets-1)];
+		return get(tick, freqToIndex(frequency));
 	}
 
 	@Override
 	public double get(int tick, int bin) {
 		if (ticks.size() <= tick || numBuckets <= bin) {
-			throw new IllegalArgumentException("Trying to access tick that doesn't exit!");
+			throw new IllegalArgumentException(
+					String.format("Trying to access tick that doesn't exist! Bounds: t:[0,%d], f:[0,%d], accessed: (%d,%d)",
+						getMaxTick(), numBuckets, tick, bin));
 		}
 		return ticks.get(tick)[bin];
 	}

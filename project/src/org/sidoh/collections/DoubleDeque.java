@@ -38,6 +38,21 @@ public class DoubleDeque {
 		
 		return value;
 	}
+	
+	public double peekFirst() {
+		if (size == 0) {
+			throw new IllegalStateException("Trying to peek on an empty deque");
+		}
+		return values[start];
+	}
+	
+	public double peekLast() {
+		if (size == 0) {
+			throw new IllegalStateException("Trying to peek on an empty deque");
+		}
+		int ix = (end -1) < 0 ? values.length-1 :end-1;
+		return values[ix];
+	}
 
 	public void addLast(double value) {
 		if (size >= capacity) {
@@ -51,5 +66,19 @@ public class DoubleDeque {
 	
 	public int size() {
 		return size;
+	}
+	
+	public String toString() {
+		StringBuilder b = new StringBuilder("[");
+		
+		for (int i = 0; i < size; i++) {
+			b.append(values[(start + i) % capacity]);
+			if ( i < (size-1) ) {
+				b.append(", ");
+			}
+		}
+		b.append("]");
+		
+		return b.toString();
 	}
 }

@@ -37,7 +37,7 @@ public class DownShiftingHeightScorer extends HistogramScorer {
 		
 		MinMaxPriorityQueue<Integer> pq = 
 			MinMaxPriorityQueue
-				.orderedBy(Collections.reverseOrder())
+				.orderedBy(Collections.<Integer>reverseOrder())
 				.maximumSize(size)
 				.create();
 		
@@ -45,12 +45,19 @@ public class DownShiftingHeightScorer extends HistogramScorer {
 			pq.add(bucket.size());
 		}
 		
+		pq.poll();
+		double sum = 0d;
+		for (int value : pq) {
+			sum += value;
+		}
+		
 		double minInNth = pq.peekLast();
 		double max = hist.getMaxCount();
-		double den = Math.pow((max-minInNth), 2) / 2;
-		den = Math.max(1, den);
+//		double den = Math.pow((max-minInNth), 2) / 10;
+//		den = Math.max(1, den);
+		double den = max-(sum/pq.size());
 		
-		return (1d - 1d/den);
+		return den;
 	}
 
 }

@@ -73,7 +73,7 @@ public class Histogram {
 	}
 	
 	public double meanCount() {
-		return total / (double)values.size();
+		return total / (double)(values.size());
 	}
 	
 	public double sdCount() {

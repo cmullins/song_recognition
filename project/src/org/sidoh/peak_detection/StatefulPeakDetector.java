@@ -8,8 +8,13 @@ package org.sidoh.peak_detection;
  *
  */
 public abstract class StatefulPeakDetector implements ValueListener {
+	
 	public abstract static class Builder {
 		public abstract StatefulPeakDetector create(PeakListener peaks);
+		
+		public Builder withSmoothingFunction(StatefulSmoothingFunction.Builder smoothingFnBuilder) {
+			return new StatefulSmoothedPeakDetector.Builder(smoothingFnBuilder, this);
+		}
 	}
 	
 	private final PeakListener peaks;
@@ -51,7 +56,17 @@ public abstract class StatefulPeakDetector implements ValueListener {
 	 * @param sds
 	 * @return
 	 */
-	public static Builder sdsFromMean(int windowWidth, double sds) {
+	public static StatefulSdsFromMeanPeakDetector.Builder sdsFromMean(int windowWidth, double sds) {
 		return new StatefulSdsFromMeanPeakDetector.SdsFromMeanBuilder(windowWidth, sds);
+	}
+	
+	/**
+	 * Get a Builder that creates instances of {@link StatefulMeanDeltaPeakDetector}.
+	 * 
+	 * @param windowWidth
+	 * @return
+	 */
+	public static StatefulMeanDeltaPeakDetector.Builder meanDelta(int windowWidth) {
+		return new StatefulMeanDeltaPeakDetector.Builder(windowWidth);
 	}
 }

@@ -62,6 +62,10 @@ public abstract class StarBuffer {
 	}
 	
 	public static StarBuffer.Builder evenlySpreadInTime(double starDensityFactor) {
-		return new EquallyDistributedTimeStarBuffer.Builder(starDensityFactor);
+		return new EvenlySpreadInTimeStarBuffer.Builder(starDensityFactor);
+	}
+	
+	public static StarBuffer.Builder evenlySpreadInFrequency(double starDensityFactor) {
+		return new EvenlySpreadInFrequencyStarBuffer.Builder(starDensityFactor);
 	}
 }

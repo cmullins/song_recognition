@@ -24,12 +24,11 @@ public class Classifier {
 		
 		Settings settings = Settings.defaults()
 			.setProgressNotifer(ProgressNotifier.nullNotifier())
-			.setStarDensityFactor(0.15);
-		settings = settings
-			.setHistogramScorer(new LoggingScorer("/tmp/histograms", settings.getHistogramScorer()));
+		;
 		
 		HashSignatureDatabase db = new HashSignatureDatabase(
 				H2Helper.getConnection(args[0]), settings);
+		
 		StarHashExtractor extractor = settings.getStarHashExtractor();
 		FrameBuffer.Builder frameBuilder = settings.getBufferBuilder();
 		Spectrogram.Builder specBuilder = settings.getSpectrogramBuilder();

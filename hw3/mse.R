@@ -5,9 +5,8 @@
 get_mse_separator <- function(X) {
 	X <- as.matrix(X)
 
-	# Suppose that the last column in X is the class for each row. Then the rest of
-	# the columns should be multiplied by its sign...
-	Y <- cbind((X[,ncol(X)] * X[,1:ncol(X)-1]), X[,ncol(X)])
+	# Name stuff so it's consistent with book/slides
+	Y <- X
 	b <- matrix(1, nrow = nrow(Y))
 
 	# Check if pseudo-inverse exists

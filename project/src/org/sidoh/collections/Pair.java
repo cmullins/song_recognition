@@ -55,6 +55,10 @@ public class Pair<T1, T2> {
 			return false;
 		return true;
 	}
+	
+	public String toString() {
+		return "(" + v1 + "," + v2 + ")";
+	}
 
 	public static <T1, T2> Pair<T1, T2> create(T1 v1, T2 v2) {
 		return new Pair<T1, T2>(v1, v2);

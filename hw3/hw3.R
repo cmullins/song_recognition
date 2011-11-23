@@ -78,6 +78,22 @@ plot_class_data <- function (data, title, legend = TRUE) {
 	}
 }
 
+# Adds a column for a bias (constant) term and inverts the sign of the negative
+# class.
+prepare_data_perceptron <- function(X) {
+	n <- ncol(X)
+
+	# Introduce bias 
+	X <- cbind(X[,1:n-1], 1, X[,n])
+}
+
+# Prepares data for MSE. Inverts the sign of the negative class.
+prepare_data_mse <- function(X) {
+	n <- ncol(X)-1
+
+	cbind( (X[,1:n] * X[,n+1]), X[,n+1] )
+}
+
 # Begin HW
 ################################################################################
 
@@ -86,6 +102,9 @@ source('perceptron.R')
 
 # Load the data
 data <- as.matrix(read.table(settings$DATA_FILE))
+
+data_perceptron <- prepare_data_perceptron(data)
+data_mse <- prepare_data_mse(data)
 
 # Plot the data
 generate_plot('raw_data',
@@ -126,7 +145,7 @@ plot_perceptron <- function(learning_rate_fn, title) {
 
 		# Find linear separator. The callback_fn does all of the work. We don't
 		# actually want to use the boundary for anything... just plotting.
-		get_perceptron(data, learning_rate_fn, callback_fn)
+		get_perceptron(data_perceptron, learning_rate_fn, callback_fn)
 	}
 
 	par(mfrow = old)
@@ -151,7 +170,7 @@ for (rate in settings$PERCEPTRON_LEARNING_RATE) {
 
 generate_plot('mse',
 function() {
-	a <- get_mse_separator(data)
+	a <- get_mse_separator(data_mse)
 
 	# Plot class data
 	plot_class_data(data, '', FALSE)
