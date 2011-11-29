@@ -100,5 +100,5 @@ write_plot("accuracy_vs_wrong_answer_tradeoff",
 			main = "Accuracy vs. Wrong answer tradeoff",
 			xlab = "Accuracy",
 			ylab = "Wrong answer rate",
-			type = 'b')
+			type = 'l')
 	})

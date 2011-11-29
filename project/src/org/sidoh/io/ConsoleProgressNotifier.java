@@ -33,7 +33,7 @@ public class ConsoleProgressNotifier extends ProgressNotifier {
 	}
 
 	@Override
-	public void update(int value) {
+	protected void render(int value) {
 		if (!done && ((value % updateRate) == 0 || value >= maxValue)) {
 			printProgress(value);
 		}

@@ -22,13 +22,13 @@ public class Histogram {
 	private int minBin;
 	private int total;
 	
-	public Histogram() {
+	public Histogram(int maxValues) {
 		maxCount = 0;
 		minCount = Integer.MAX_VALUE;
 		maxBin = -1;
 		minBin = -1;
 		total = 0;
-		values = new HashOfLists<Integer, Double>();
+		values = new HashOfLists<Integer, Double>(2*maxValues);
 	}
 	
 	public void addValue(double value) {

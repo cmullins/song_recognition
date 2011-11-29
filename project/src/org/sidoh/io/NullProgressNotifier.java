@@ -14,7 +14,7 @@ public class NullProgressNotifier extends ProgressNotifier {
 	}
 
 	@Override
-	public void update(int value) {
+	protected void render(int value) {
 		// TODO Auto-generated method stub
 	}
 

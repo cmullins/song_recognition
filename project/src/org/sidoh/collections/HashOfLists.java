@@ -5,6 +5,14 @@ import java.util.List;
 
 public class HashOfLists<K, V> extends DefaultingHashMap<K, List<V>> {
 	private static final long serialVersionUID = 8941935772174902962L;
+	
+	public HashOfLists() {
+		super();
+	}
+	
+	public HashOfLists(int maxValues) {
+		super(maxValues);
+	}
 
 	@Override
 	protected List<V> getDefaultValue() {

@@ -22,7 +22,7 @@ public class StarHashComparator implements LikenessComparator<StarHashSignature>
 			return similarity(o2, o1);
 		}
 		
-		Histogram offsets = new Histogram();
+		Histogram offsets = new Histogram(Math.max(hashes1.size(), hashes2.size()));
 		for (Integer hash : hashes1.keySet()) {
 			if (hashes2.containsKey(hash)) {
 				Set<Integer> offsets1 = hashes1.get(hash);

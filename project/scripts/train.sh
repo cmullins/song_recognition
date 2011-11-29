@@ -15,4 +15,4 @@ if [ -e "$dbname.h2.db" ]; then
 fi
 
 rm -rf "$dbname*"
-java -Xmx${MAX_HEAP_SIZE} -cp ${project_cp} org.sidoh.song_recognition.database.BulkDbBuilder $dbname $DIR/../songs/wavs/*
+java -Xmx${MAX_HEAP_SIZE} -cp ${project_cp} org.sidoh.song_recognition.database.BulkDbBuilder "$dbname" $DIR/../songs/wavs/*

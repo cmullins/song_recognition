@@ -12,4 +12,4 @@ if [ -z "$dbname" ] || [ -z "$test_dir" ]; then
 	exit 1
 fi
 
-java -Xmx${MAX_HEAP_SIZE} -cp ${project_cp} org.sidoh.song_recognition.benchmark.Classifier $dbname $test_dir/*
+java -Xmx${MAX_HEAP_SIZE} -cp ${project_cp} org.sidoh.song_recognition.benchmark.Classifier "$dbname" "$test_dir"/*

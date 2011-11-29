@@ -6,22 +6,28 @@ public abstract class ProgressNotifier {
 			return new ChanneledProgressNotifier.Builder(this, channel);
 		}
 		
-		public IncrementingProgressNotifier.Builder incrementing() {
-			return new IncrementingProgressNotifier.Builder(this);
-		}
-		
 		public abstract ProgressNotifier create(String message, int maxValue);
 	}
 	
 	protected final int maxValue;
 	protected String message;
+	protected int lastValue;
 	
 	public ProgressNotifier(String message, int maxValue) {
 		this.message = message;
 		this.maxValue = maxValue;
+		this.lastValue = 0;
 	}
 	
-	public abstract void update(int value);
+	public void update(int value) {
+		render(value);
+	}
+	
+	public synchronized void update() {
+		render(++lastValue);
+	}
+	
+	protected abstract void render(int value);
 	
 	public abstract void complete();
 	

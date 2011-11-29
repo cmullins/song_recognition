@@ -35,7 +35,5 @@ public class BulkDbBuilder {
 		
 		System.out.println("Creating indexes...");
 		db.createIndexes();
-		
-		System.out.println("All done.");
 	}
 }

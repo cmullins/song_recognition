@@ -30,7 +30,7 @@ public class EvenlySpreadInFrequencyStarBuffer extends StarBuffer {
 	public EvenlySpreadInFrequencyStarBuffer(Spectrogram spec, double starDensityFactor) {
 		super(spec);
 		
-		int perFreqSize = (int)Math.floor((starDensityFactor*spec.getMaxTick()) / spec.getBinFloors().length);
+		int perFreqSize = Math.max(1,(int)Math.floor((starDensityFactor*spec.getMaxTick()) / spec.getBinFloors().length));
 		
 		stars = Collections.synchronizedMap(new HashOfPriorityQueues<Integer, Star>(
 					MinMaxPriorityQueue

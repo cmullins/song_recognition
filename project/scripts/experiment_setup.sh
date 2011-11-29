@@ -40,14 +40,21 @@ done
 
 cd $WAVS_DIR
 for wav in $(ls *.wav); do
+	song_len=$(sox $wav -n stat 2>&1 | grep Length | awk '{printf("%d", $NF)}')
+
 	for start_location in $START_LOCATIONS; do
 		for length in $SAMPLE_LENGTHS; do
 			end_location=$(($start_location + $length))
-			sample_name=$SAMPLES_DIR/$(basename "$wav" .wav)-$start_location-to-$end_location.wav
 
-			if [ ! -f "$sample_name" ]; then
-				echo "Trimming: $sample_name"
-				sox $wav $sample_name trim $start_location $length
+			# If the end location goes past the length of the song, then forget about
+			# this sample. It'll screw up stats.
+			if [ $end_location -le $song_len ]; then
+				sample_name=$SAMPLES_DIR/$(basename "$wav" .wav)-$start_location-to-$end_location.wav
+
+				if [ ! -f "$sample_name" ]; then
+					echo "Trimming: $sample_name"
+					sox $wav $sample_name trim $start_location $length
+				fi
 			fi
 		done
 	done

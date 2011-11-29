@@ -12,8 +12,9 @@ fi
 for i in $(ls $directory/*.pgm); do
 	png=$(basename $i .pgm).png
 
-	if [ ! -e $png ] || [ $i -nt $png ]; then
+	if [ ! -e "$png" ] || [ "$i" -nt $png ]; then
 		echo "Converting $i --> $png..."
-		convert $i $png
+		convert "$i" "$png"
+		rm "$i"
 	fi
 done

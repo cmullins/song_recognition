@@ -19,13 +19,23 @@ public class StarHashExtractor implements SpectrogramSignatureExtractor<StarHash
 	private final Region.Builder regionBuilder;
 	private final int timeResolution;
 	private final ProgressNotifier.Builder progress;
-
+	private final Region.Builder reverseRegionBuilder;
+	
 	public StarHashExtractor(ConstellationMapExtractor starExtractor, 
 			Region.Builder regionBuilder, 
 			int timeResolution,
 			ProgressNotifier.Builder progress) {
+		this(starExtractor, regionBuilder, null, timeResolution, progress);
+	}
+
+	public StarHashExtractor(ConstellationMapExtractor starExtractor, 
+			Region.Builder regionBuilder, 
+			Region.Builder reverseRegionBuilder,
+			int timeResolution,
+			ProgressNotifier.Builder progress) {
 		this.starExtractor = starExtractor;
 		this.regionBuilder = regionBuilder;
+		this.reverseRegionBuilder = reverseRegionBuilder;
 		this.timeResolution = timeResolution;
 		this.progress = progress;
 	}
@@ -36,13 +46,24 @@ public class StarHashExtractor implements SpectrogramSignatureExtractor<StarHash
 		List<Star> stars = new ArrayList<Star>(starSig.getConstellationMap().getStars());
 		Collections.sort(stars, new TimeStarComparator());
 		
-		ProgressNotifier notifier = progress.create("Extracting hash values...", stars.size());
-		int i = 0;
-		
-		Set<Region> regions = new HashSet<Region>();
 		TreeMapOfSets<Integer, Integer> starHashes = new TreeMapOfSets<Integer, Integer>();
-		for (Star s : stars) {
+
+		forwardExtract(stars, starHashes, spec);
+		if (reverseRegionBuilder != null) {
+			reverseExtract(stars, starHashes, spec);
+		}
+		
+		return new StarHashSignature(starSig.getConstellationMap(), starHashes);
+	}
+	
+	protected void forwardExtract(List<Star> stars, TreeMapOfSets<Integer, Integer> hashes, Spectrogram spec) {
+		ProgressNotifier notifier = progress.create("Extracting hash values (forward)...", stars.size());
+		Set<Region> regions = new HashSet<Region>();
+
+		for (int i = 0; i < stars.size(); i++) {
+			Star s = stars.get(i);
 			Set<Region> toRemove = new HashSet<Region>();
+			
 			for (Region region : regions) {
 				switch (region.isInRegion(s.getTick(), s.getBin())) {
 				case IN_REGION:
@@ -50,24 +71,54 @@ public class StarHashExtractor implements SpectrogramSignatureExtractor<StarHash
 							region.getX(), s.getTick(), 
 							region.getY(), s.getBin(),
 							spec);
-					starHashes.addFor(hash, getTime(s));
+					hashes.addFor(hash, getTime(s));
 					break;
 				case AFTER_REGION:
 					toRemove.add(region);
 				}
 			}
+			
 			regions.removeAll(toRemove);
 			regions.add(regionBuilder.create(s.getTick(), s.getBin()));
 			
-			notifier.update(i++);
+			notifier.update();
 		}
 		
 		notifier.complete();
+	}
+	
+	protected void reverseExtract(List<Star> stars, TreeMapOfSets<Integer, Integer> hashes, Spectrogram spec) {
+		ProgressNotifier notifier = progress.create("Extracting hash values (reverse)...", stars.size());
+		Set<Region> regions = new HashSet<Region>();
+
+		for (int i = stars.size()-1; i >= 0; i--) {
+			Star s = stars.get(i);
+			Set<Region> toRemove = new HashSet<Region>();
+			
+			for (Region region : regions) {
+				switch (region.isInRegion(s.getTick(), s.getBin())) {
+				case IN_REGION:
+					int hash = StarHashSignature.computeHash(
+							region.getX(), s.getTick(), 
+							region.getY(), s.getBin(),
+							spec);
+					hashes.addFor(hash, getTime(s));
+					break;
+				case AFTER_REGION:
+					toRemove.add(region);
+				}
+			}
+			
+			regions.removeAll(toRemove);
+			regions.add(reverseRegionBuilder.create(s.getTick(), s.getBin()));
+			
+			notifier.update();
+		}
 		
-		return new StarHashSignature(starSig.getConstellationMap(), starHashes);
+		notifier.complete();
 	}
 
 	protected int getTime(Star s) {
-		return (int)Math.floor(s.getTick());
+		return s.getTick();
 	}
 }

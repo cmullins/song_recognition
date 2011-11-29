@@ -8,4 +8,4 @@ if [ -z "$file" ]; then
 	exit 1
 fi
 
-R --no-save --slave --args $file < $DIR/gather_stats_.R
+R --no-save --slave --args "$file" < $DIR/gather_stats_.R

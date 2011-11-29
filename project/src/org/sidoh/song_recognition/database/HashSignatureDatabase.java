@@ -5,6 +5,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -65,6 +66,8 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 		private final ProgressNotifier.Builder progress;
 
 		private HashOfSets<Integer, Pair<Integer, Integer>> cache;
+
+		private boolean inMemory = false;
 		
 		public DbHelper(Connection db, int timeResolution, ProgressNotifier.Builder progress) throws SQLException {
 			this.db = db;
@@ -101,9 +104,6 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 			int id = getLastId();
 			
 			Map<Integer, Set<Integer>> hashes = sig.getStarHashes();
-			ProgressNotifier progressNotifier 
-				= progress.create("Adding hash values to database...", hashes.keySet().size());
-			int i = 1;
 
 			for (Integer hash : hashes.keySet()) {
 				for (Integer offset : hashes.get(hash)) {
@@ -112,11 +112,7 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 					insertHashesStatement.setInt(3, id);
 					insertHashesStatement.execute();
 				}
-				
-				progressNotifier.update(i++);
 			}
-			
-			progressNotifier.complete();
 		}
 		
 		public void loadIntoMemory() throws SQLException {
@@ -137,6 +133,8 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 				notifier.update(i++);
 			}
 			notifier.complete();
+			
+			this.inMemory = true;
 		}
 		
 		public Map<Integer, ReconstructedStarHashSignature> getOffsetsByHashes(StarHashSignature sig) throws SQLException {
@@ -159,7 +157,10 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 		public SongMetaData getSongById(int id) throws SQLException {
 			findSongStatement.setInt(1, id);
 			ResultSet results = findSongStatement.executeQuery();
-			results.next();
+			
+			if (! results.next()) {
+				throw new RuntimeException("Coulding find song with ID = " + id + "!");
+			}
 			
 			return new SongMetaData(
 				results.getString("name"),
@@ -177,9 +178,12 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 			if (cache.containsKey(hashValue)) {
 				return cache.get(hashValue);
 			}
-			else {
+			else if (! inMemory) {
 				findHashesStatement.setInt(1, hashValue);
 				return new HashResultIterator(findHashesStatement.executeQuery()); 
+			}
+			else {
+				return Collections.emptyList();
 			}
 		}
 		
@@ -263,6 +267,7 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 	}
 
 	public HashSignatureDatabase(Connection db, ProgressNotifier.Builder progress, Settings settings) throws SQLException {
+		super(settings.getMaxNumThreads());
 		this.db = db;
 		this.settings = settings;
 		this.dbHelper = new DbHelper(db, settings.getTimeResolution(), progress);
@@ -277,7 +282,7 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 	}
 
 	@Override
-	public void addSong(SongMetaData song, StarHashSignature sig) {
+	protected void addSongInner(SongMetaData song, StarHashSignature sig) {
 		try {
 			dbHelper.addSongToDb(song, sig);
 		}
@@ -290,7 +295,11 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 	public QueryResponse<StarHashSignature> findSong(StarHashSignature signature) {
 		try {
 			Map<Integer, ReconstructedStarHashSignature> offsetsByHashes = dbHelper.getOffsetsByHashes(signature);
-			QueryResponse<StarHashSignature> response = getResponse(settings.getStarHashComparator(), offsetsByHashes.values(), signature);
+			QueryResponse<StarHashSignature> response = getResponse(
+					settings.getProgressNotifer(),
+					settings.getStarHashComparator(), 
+					offsetsByHashes.values(), 
+					signature);
 			ReconstructedStarHashSignature sig = (ReconstructedStarHashSignature) response.signature();
 			
 			if (sig != null) {

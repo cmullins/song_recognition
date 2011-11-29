@@ -23,4 +23,4 @@ if [ -z "$test_dir" ]; then
 fi
 
 rm -rf $report
-java -Xmx${MAX_HEAP_SIZE} -cp ${project_cp} org.sidoh.song_recognition.benchmark.BulkTest $dbname $report $test_dir/*
+java -Xmx${MAX_HEAP_SIZE} -cp ${project_cp} org.sidoh.song_recognition.benchmark.BulkTest "$dbname" "$report" "$test_dir"

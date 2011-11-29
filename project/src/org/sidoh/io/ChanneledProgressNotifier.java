@@ -1,5 +1,11 @@
 package org.sidoh.io;
 
+import java.io.FileDescriptor;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.nio.channels.Channels;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -13,9 +19,20 @@ public class ChanneledProgressNotifier extends ProgressNotifier {
 			this.inner = inner;
 			this.channel = channel;
 		}
+		
+		/**
+		 * Makes {@link ChanneledProgressNotifier} instances created by this builder
+		 * controllable by stdin. Pressing any key will toggle the channel on or off.
+		 * 
+		 * @return
+		 */
+		public Builder controlledByStdin() {
+			StdinChannelToggle.launch(channel);
+			return this;
+		}
 
 		@Override
-		public ProgressNotifier create(String message, int maxValue) {
+		public ChanneledProgressNotifier create(String message, int maxValue) {
 			return new ChanneledProgressNotifier(channel, inner, message, maxValue);
 		}
 	}
@@ -38,9 +55,9 @@ public class ChanneledProgressNotifier extends ProgressNotifier {
 	}
 
 	@Override
-	public void update(int value) {
+	protected void render(int value) {
 		if (updatesEnabled(channel)) {
-			getInner().update(value);
+			getInner().render(value);
 		}
 	}
 
@@ -98,5 +115,87 @@ public class ChanneledProgressNotifier extends ProgressNotifier {
 	 */
 	public static void toggleChannel(String channel) {
 		channels.put(channel, !updatesEnabled(channel));
+	}
+	
+	/**
+	 * This class runs in a thread that toggles a channel as keys are pressed.
+	 * 
+	 */
+	protected static class StdinChannelToggle implements Runnable {
+		private static StdinChannelToggle instance = null;
+		
+		private final String channel;
+		private final Reader in;
+
+		public StdinChannelToggle(String channel, Reader in) {
+			this.channel = channel;
+			this.in = in;
+		}
+		
+		@Override
+		public void run() {
+			while (true) {
+				if (! Thread.interrupted()) {
+					try {
+						if (System.in.available() > 0) {
+							System.in.read();
+							toggleChannel(channel);
+						}
+						else {
+							Thread.sleep(100);
+						}
+					}
+					catch (Exception e) { 
+						break;
+					}
+				}
+			}
+		}
+//		public void run() {
+//			for (;;) {
+//				if (! Thread.interrupted()) {
+//					try {
+//						System.out.println(in.getClass());
+//						in.read();
+//						toggleChannel(channel);
+//					}
+//					catch (Exception e) { 
+//						System.out.println(e);
+//					}
+//				}
+//			}
+//		}
+		
+		/**
+		 * 
+		 * @param channel
+		 */
+		public static void launch(String channel) {
+			if (instance != null) {
+				throw new IllegalStateException("Cannot have more than one stdin channel toggle!");
+			}
+			// This creates an stdin InputStream that can be interrupted.
+			final InputStreamReader reader
+				= new InputStreamReader(Channels.newInputStream(new FileInputStream(FileDescriptor.in).getChannel()));
+			
+			instance = new StdinChannelToggle(channel, reader);
+			
+			// Start it running in a new thread
+			final Thread toggleThread = new Thread(instance);
+			
+			toggleThread.setDaemon(true);
+			toggleThread.start();
+			
+			final Runnable killTask = new Runnable() {
+				@Override
+				public void run() {
+					toggleThread.interrupt();
+				}
+			};
+			
+			// Add a shutdown hook that will stop the toggleThread if the program stops
+			// unexpectedly.
+			Runtime.getRuntime().addShutdownHook(new Thread(killTask));
+		}
 	}
 }

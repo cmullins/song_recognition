@@ -10,7 +10,7 @@ public class H2Helper {
 		try {
 			Class.forName("org.h2.Driver");
 			return DriverManager.getConnection(
-				String.format("jdbc:h2:%s", new File(filename).getAbsolutePath()),
+				String.format("jdbc:h2:%s;MULTI_THREADED=TRUE", new File(filename).getAbsolutePath()),
 				"sa",
 				"");
 		}

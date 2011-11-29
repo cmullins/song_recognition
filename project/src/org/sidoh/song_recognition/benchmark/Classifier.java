@@ -23,11 +23,15 @@ public class Classifier {
 		}
 		
 		Settings settings = Settings.defaults()
-			.setProgressNotifer(ProgressNotifier.nullNotifier())
+		;
+		settings = 
+			settings.setProgressNotifer(
+				settings.getProgressNotifer().channeled("noisy").controlledByStdin())
 		;
 		
 		HashSignatureDatabase db = new HashSignatureDatabase(
 				H2Helper.getConnection(args[0]), settings);
+		db.loadIntoMemory();
 		
 		StarHashExtractor extractor = settings.getStarHashExtractor();
 		FrameBuffer.Builder frameBuilder = settings.getBufferBuilder();

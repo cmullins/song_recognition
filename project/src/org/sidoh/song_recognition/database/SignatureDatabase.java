@@ -7,7 +7,15 @@ import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.io.Serializable;
 import java.util.Collection;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.ThreadFactory;
 
+import javax.management.RuntimeErrorException;
+
+import org.sidoh.concurrency.SynchronizedMaxTracker;
+import org.sidoh.io.ProgressNotifier;
 import org.sidoh.song_recognition.signature.LikenessComparator;
 import org.sidoh.song_recognition.signature.Signature;
 
@@ -43,12 +51,46 @@ public abstract class SignatureDatabase<T extends Signature> implements Serializ
 		}
 	}
 	
+	protected final ExecutorService workerPool;
+	private final int maxThreads;
+	
+	public SignatureDatabase(int maxThreads) {
+		this.maxThreads = maxThreads;
+		workerPool = Executors.newSingleThreadExecutor();
+		
+		// Add a hook that will shut down the worker pool when the main thread dies.
+		final Thread mainThread = Thread.currentThread();
+		Thread workPoolKiller = new Thread(new Runnable() {
+			@Override
+			public void run() {
+				try {
+					mainThread.join();
+				}
+				catch (InterruptedException e) {
+					throw new RuntimeException(e);
+				}
+				finally {
+					System.out.println("Shutting down worker pool...");
+					workerPool.shutdown();
+				}
+			}
+		}, "Worker pool shutdown action");
+		workPoolKiller.start();
+	}
+	
 	/**
-	 * Add a song to the database.
+	 * Add a song to the database. This method runs asynchronously.
 	 * 
 	 * @param song
 	 */
-	public abstract void addSong(SongMetaData song, T sig);
+	public final void addSong(final SongMetaData song, final T sig) {
+		workerPool.execute(new Runnable() {
+			@Override
+			public void run() {
+				addSongInner(song, sig);
+			}
+		});
+	}
 	
 	/**
 	 * Find a song given a signature.
@@ -59,6 +101,31 @@ public abstract class SignatureDatabase<T extends Signature> implements Serializ
 	public abstract QueryResponse<T> findSong(T signature);
 	
 	/**
+	 * Actually add a song to the DB. This method can be blocking.
+	 * 
+	 * @param song
+	 * @param sig
+	 */
+	protected abstract void addSongInner(SongMetaData song, T sig);
+	
+	/**
+	 * 
+	 * @param comparator
+	 * @param candidates
+	 * @param query
+	 * @return
+	 */
+	protected QueryResponse<T> getResponse(
+			LikenessComparator<T> comparator, 
+			Collection<? extends T> candidates, 
+			T query) {
+		return getResponse(ProgressNotifier.nullNotifier(),
+			comparator,
+			candidates,
+			query);
+	}
+	
+	/**
 	 * Given a set of candidates, choose the best one using the comparator and
 	 * construct a {@link QueryResponse}.
 	 * 
@@ -66,23 +133,42 @@ public abstract class SignatureDatabase<T extends Signature> implements Serializ
 	 * @param query
 	 * @return
 	 */
-	protected static <T extends Signature> QueryResponse<T> getResponse(
-			LikenessComparator<T> comparator, 
-			Collection<? extends T> candidates, 
-			T query) {
-		double bestScore = Double.NEGATIVE_INFINITY;
-		T best = null;
+	protected QueryResponse<T> getResponse(
+			final ProgressNotifier.Builder progressBuilder,
+			final LikenessComparator<T> comparator, 
+			final Collection<? extends T> candidates, 
+			final T query) {
 		
-		for (T candidate : candidates) {
-			double score = comparator.similarity(candidate, query);
-			
-			if (score > bestScore) {
-				bestScore = score;
-				best  = candidate;
-			}
+		final ProgressNotifier progress = progressBuilder.create("Scoring matches...", candidates.size());
+		final SynchronizedMaxTracker<Double, T> maxTracker = SynchronizedMaxTracker.<Double, T>defaultComparator().create();
+		final Semaphore tasks = new Semaphore(-1 * candidates.size() + 1);
+		ExecutorService pool = Executors.newFixedThreadPool(maxThreads);
+		
+		for (final T candidate : candidates) {
+			pool.execute(new Runnable() {
+				@Override
+				public void run() {
+					maxTracker.offer(
+						comparator.similarity(candidate, query),
+						candidate);
+					
+					progress.update();
+					tasks.release();
+				}
+			});
 		}
 		
-		return new QueryResponse<T>(bestScore, null, best);
+		pool.shutdown();
+		try {
+			tasks.acquire();
+		} catch (InterruptedException e) {
+			throw new RuntimeException(e);
+		}
+		progress.complete();
+		
+		System.out.println(maxTracker.maxKey() + " " + maxTracker.maxValue());
+		
+		return new QueryResponse<T>(maxTracker.maxKey(), null, maxTracker.maxValue());
 	}
 	
 	/**
