@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en"> 
+	<head> 
+		<meta http-equiv="content-type" content="text/html; charset=UTF-8" /> 
+		<link rel="stylesheet" type="text/css" href="main.css" /> 
+		<link rel="stylesheet" type="text/css" href="jquery.tooltip.css" />
+		<script type="text/javascript" src="jquery.min.js"></script>
+		<script type="text/javascript" src="jquery-ui.min.js"></script>
+		<script type="text/javascript" src="jquery.tooltip.js"></script>
+		<script type="text/javascript" src="jquery.simplemodal.1.4.1.min.js"></script>
+		<title>Chris Mullins - ICS 665</title> 
+	</head> 
+
+<body>
+<script type="text/javascript">
+var lastUpdated = -1;
+var refreshPeriod = 5000;
+var _data;
+
+function updateReport() {
+	$.getJSON('report_data.json')
+	.done(function(data) {
+		if (lastUpdated != data['lastUpdated']) {
+			lastUpdated = data['lastUpdated'];
+			_data = data;
+			refreshReport(data);
+		}
+
+		setTimeout('updateReport()', refreshPeriod);
+	});
+};
+
+function refreshReport(data) {
+	$('#summary').show();
+	$('#accuracy').html(data['accuracy']);
+	$('#max-wrong-answer-confidence').html(data['maxIncorrectConfidence']);
+	$('#mean-confidence').html(data['meanConfidence']);
+
+	$('#raw').val(JSON.stringify(data));
+
+	var items = data['entries'];
+
+	for (var i = 0; i < items.length; i++) {
+		updateOrAddEntry(i, items[i]);
+	}
+};
+
+function updateOrAddEntry(i, item) {
+	var elmtSelector = '#item-' + i;
+
+	if ($(elmtSelector).length == 0) {
+		var html = '<tr>';
+
+		html += '<td>' + i + '</td>';
+		html += '<td>' + item['songId'] + '</td>';
+		html += '<td>' + item['confidence'] + '</td>';
+		html += '<td>' + item['addedNoiseId'] + '</td>';
+		html += '<td>' + item['clipStart'] + '</td>';
+		html += '<td>' + item['clipEnd'] + '</td>';
+		html += '<td>' + (item['clipEnd']-item['clipStart']) + '</td>';
+		
+		html += "<td data-present=\"" + item['hasSpectrogram'] + "\" class=\"spectrogram\">" + getSpectrogramColumnHtml(i, item) + "</td>";
+		html += "<td data-present=\"" + item['hasSpectrograms'] + "\" class=\"histograms\">" + getHistogramsColumnHtml(i, item) + "</td>";
+
+		html += '</tr>';
+
+		$('#itemized-results tr:last').after(html);
+		$('#itemized-results tr:last').attr('id', 'item-' + i);
+
+		var classColumn = $('td', $(elmtSelector)).next().filter(':first');
+		classColumn.addClass(item['matchCorrect'] ? 'correct' : 'incorrect');
+		if (!item['matchCorrect']) {
+			classColumn.tooltip({
+				delay: 0,
+				bodyHandler: function() {
+					return "Should've been: " + item['clipName'];
+				}
+			});
+		}
+	}
+	else {
+		$('.spectrogram', elmtSelector).html(getSpectrogramColumnHtml(i, item));
+		$('.histograms', elmtSelector).html(getHistogramsColumnHtml(i, item));
+	}
+};
+
+function getSpectrogramColumnHtml(i, item) {
+	if (! item['hasSpectrogram']) {
+		return "--";
+	}
+	else {
+		return "<a href=\"#\" class=\"spectrogram-link\" data-path=\"" + item['spectrogramPath'] + "\">view</a>";
+	}
+};
+
+function getHistogramsColumnHtml(i, item) {
+	if (! item['hasHistograms']) {
+		return "--";
+	}
+	else {
+		return "<a href=\"#\" class=\"histogram-link\" data-id=\"" + i + "\">view</a>";
+	}
+};
+
+$(document).ready(function() {
+	jQuery.fn.center = function () {
+    	this.css("position","absolute");
+    	this.css("top", (($(window).height() - this.outerHeight()) / 2) + $(window).scrollTop() + "px");
+    	this.css("left", (($(window).width() - this.outerWidth()) / 2) + $(window).scrollLeft() + "px");
+    	return this;
+	}
+
+	//$('#modal-window').modal();
+	updateReport();
+
+	$('#itemized-results tbody').delegate('.histogram-link', 'click',
+	function() {
+		var maxHeight = $(window).height() - 100;
+
+		var histPaths = _data['entries'][$(this).attr('data-id')]['histogramPaths'];
+		var html = '<div id="histogram-view-contents"><div style="float:left;"><div id="table-container"><table class="histogram-table">';
+
+		histPaths = histPaths.sort(function(a,b) {
+			var a1 = b['score'], b1 = a['score'];
+
+			return (b1<a1) - (a1<b1);
+		});
+		for (var h in histPaths) {
+			var hist = histPaths[h];
+
+			html += '<tr><td>' + hist['songId'] + '</td>';
+			html += '<td><a href="#" class="histogram-preview" data-img="' + hist['path'] +'">' + hist['score'] + '</a></td></tr>';
+		}
+
+		html += '</table></div></div>';
+		html += '<div style="display: none; overflow: auto; float:left;" id="histogram-view-area"></div>';
+		html += '<div class="spacer"></div></div>';
+
+		$('body').css('overflow', 'hidden');
+		$('#modal-window').html(html).modal({
+			onClose : function() {
+				$.modal.close();
+				$('body').css('overflow', 'auto');
+				$('#modal-window').html('');
+			}
+		});
+		$('#simplemodal-container')
+			.height(Math.min(maxHeight, $('#simplemodal-container').height()))
+			.center();
+
+		$('#table-container').height($('#simplemodal-container').height()).css('overflow', 'auto');
+		$('.histogram-table a.histogram-preview').click(function() {
+			if ($('#histogram-view-area:visible').length == 0) {
+				$('#histogram-view-area').show();
+				$('#simplemodal-container').width($(window).width() - 100).center();
+				$('#histogram-view-area').width($('#simplemodal-container').width() - $('#table-container').width());
+			}
+
+			$('#histogram-view-area').html('<img src="/static/' + $(this).attr('data-img') + '" />');
+
+			return false;
+		});
+
+		return false;
+	});
+
+	$('#itemized-results tbody').delegate('.spectrogram-link', 'click',
+		function() {
+			$('#modal-window').html('<div class="loading">Loading...</div><div class="spectrogram-container"><img id=\"spec-img\" src="/static/' + $(this).attr('data-path') + '" /></div>');
+			$('#spec-img').hide().load(function() {
+				$('body').css('overflow', 'hidden');
+				$(this).show();
+
+				var maxHeight = $(window).height() - 100;
+				var maxWidth  = $(window).width() - 100;
+
+				$('#modal-window .loading').hide();
+				$('#simplemodal-container')
+					.height(Math.min(maxHeight, $('#spec-img').height()))
+					.width(Math.min(maxWidth, $('#spec-img').width()))
+					.center();
+			});
+			$('#modal-window').modal({
+				onClose : function() {
+					$.modal.close();
+					$('body').css('overflow', 'auto');
+					$('#spec-img').remove();
+					$('#modal-window').html('');
+				}
+			});
+			return false;
+		}
+	);
+});
+</script>
+<div id="modal-window"></div>
+<div class="content">
+	<div style="width: 1000px;">
+	<div class="header"> Overview </div>
+	<div class="table-contents">
+		<div id="summary" style="display: none; margin: 0 auto;">
+			<table>
+				<tr>
+					<td class="stat-label"> Accuracy </td>
+					<td class="stat-value" id="accuracy"></td>
+				</tr>
+				<tr>
+					<td class="stat-label"> Max wrong answer confidence </td>
+					<td class="stat-value" id="max-wrong-answer-confidence"></td>
+				</tr>
+				<tr>
+					<td class="stat-label"> Mean confidence </td>
+					<td class="stat-value" id="mean-confidence"> </td>
+				</tr>
+			</table>
+		</div>
+	</div>
+
+	<div class="header"> Itemized Details </div>
+	<div class="table-contents">
+	<table id="itemized-results">
+		<tr>
+			<td class="table-header"> ID </td>
+			<td class="table-header"> Classified Song </td>
+			<td class="table-header"> Confidence </td>
+			<td class="table-header"> Noise ID </td>
+			<td class="table-header"> Start </td>
+			<td class="table-header"> End </td>
+			<td class="table-header"> Length </td>
+			<td class="table-header"> Spectrogram </td>
+			<td class="table-header"> Histograms </td>
+		</tr>
+	</table>
+<textarea style="width:100%; height:400px;" id="raw"></textarea>
+	</div>
+</div>
+</body>
+</html>
