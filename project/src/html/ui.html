@@ -36,8 +36,6 @@ function refreshReport(data) {
 	$('#max-wrong-answer-confidence').html(data['maxIncorrectConfidence']);
 	$('#mean-confidence').html(data['meanConfidence']);
 
-	$('#raw').val(JSON.stringify(data));
-
 	var items = data['entries'];
 
 	for (var i = 0; i < items.length; i++) {
@@ -152,11 +150,15 @@ $(document).ready(function() {
 		$('.histogram-table a.histogram-preview').click(function() {
 			if ($('#histogram-view-area:visible').length == 0) {
 				$('#histogram-view-area').show();
-				$('#simplemodal-container').width($(window).width() - 100).center();
+				$('#simplemodal-container').width($(window).width() - 100)
+					.center();
 				$('#histogram-view-area').width($('#simplemodal-container').width() - $('#table-container').width());
 			}
 
-			$('#histogram-view-area').html('<img src="/static/' + $(this).attr('data-img') + '" />');
+			$('#histogram-view-area').html('<img id="histogram-img" src="/static/' + $(this).attr('data-img') + '" />');
+			$('#histogram-img').load(function() {
+				$('#simplemodal-container').height(Math.max($(this).height(), $('#simplemodal-container').height())).center();
+			});
 
 			return false;
 		});
@@ -231,7 +233,6 @@ $(document).ready(function() {
 			<td class="table-header"> Histograms </td>
 		</tr>
 	</table>
-<textarea style="width:100%; height:400px;" id="raw"></textarea>
 	</div>
 </div>
 </body>

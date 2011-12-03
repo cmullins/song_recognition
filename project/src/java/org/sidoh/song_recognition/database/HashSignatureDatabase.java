@@ -2,12 +2,17 @@ package org.sidoh.song_recognition.database;
 
 import java.io.File;
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -28,48 +33,43 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 
 	protected static class DbHelper {
 		public static final String SONG_HASHES_DEFN =
-			"CREATE TABLE IF NOT EXISTS song_hashes (" +
-				"hash_value INT, " +
-				"time_offset INT, " +
-				"song_id INT);";
+			"CREATE TABLE song_hashes (" +
+				"HASH_VALUE INT, " +
+				"TIME_OFFSET INT, " +
+				"SONG_ID INT)";
 
 		public static final String INDEX_DEFN =
-			"CREATE INDEX IF NOT EXISTS song_hashes_hash_value ON song_hashes(hash_value);";
+			"CREATE INDEX song_hashes_hash_value ON song_hashes(hash_value)";
 		
 		public static final String SONGS_DEFN =
-			"CREATE TABLE IF NOT EXISTS songs (" +
-				"id INT PRIMARY KEY AUTO_INCREMENT, " +
-				"name varchar(255), " +
-				"artist varchar(255), " +
-				"genre varchar(255));";
+			"CREATE TABLE songs (" +
+				"ID INT NOT NULL GENERATED ALWAYS AS IDENTITY PRIMARY KEY,"+
+				"NAME varchar(255))";
 		
 		public static final String INSERT_HASHES_QUERY =
-			"INSERT INTO song_hashes (hash_value, time_offset, song_id) VALUES (?,?,?);";
+			"INSERT INTO song_hashes (hash_value, time_offset, song_id) VALUES (?,?,?)";
 		
 		public static final String INSERT_SONG_QUERY =
-			"INSERT INTO songs (name,artist,genre) VALUES (?,?,?);";
+			"INSERT INTO songs (name) VALUES (?)";
 		
 		public static final String FIND_MATCHING_HASHES_QUERY =
-			"SELECT * FROM song_hashes WHERE hash_value = ?;";
+			"SELECT * FROM song_hashes WHERE hash_value = ?";
 		
 		public static final String FIND_SONG_QUERY =
-			"SELECT * FROM songs WHERE id = ?;";
-		
-		public static final String GET_LAST_ID_QUERY =
-			"CALL IDENTITY();";
+			"SELECT * FROM songs WHERE id = ?";
 		
 		private final Connection db;
 		private PreparedStatement insertHashesStatement;
 		private PreparedStatement insertSongStatement;
 		private PreparedStatement findHashesStatement;
 		private PreparedStatement findSongStatement;
-		private PreparedStatement getLastIdStatement;
 		private PreparedStatement indexStatement;
 		
 		private final int timeResolution;
 		private final ProgressNotifier.Builder progress;
 
 		private HashOfSets<Integer, Pair<Integer, Integer>> cache;
+		private Map<Integer, String> songCache;
 
 		private boolean inMemory = false;
 		
@@ -78,34 +78,69 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 			this.timeResolution = timeResolution;
 			this.progress = progress;
 			this.cache = new HashOfSets<Integer, Pair<Integer, Integer>>();
+			this.songCache = new HashMap<Integer, String>();
 			
 			initDb();
 			
 			insertHashesStatement = db.prepareStatement(INSERT_HASHES_QUERY);
-			insertSongStatement = db.prepareStatement(INSERT_SONG_QUERY);
+			insertSongStatement = db.prepareStatement(INSERT_SONG_QUERY, Statement.RETURN_GENERATED_KEYS);
 			findHashesStatement = db.prepareStatement(FIND_MATCHING_HASHES_QUERY);
 			findSongStatement = db.prepareStatement(FIND_SONG_QUERY);
-			getLastIdStatement = db.prepareStatement(GET_LAST_ID_QUERY);
 			indexStatement = db.prepareStatement(INDEX_DEFN);
 		}
 		
+		public void shutdown() {
+			try {
+				if (! db.isClosed()) {
+					DriverManager.getConnection("jdbc:derby:;shutdown=true");
+				}
+				else {
+					System.out.println("DB already closed!");
+				}
+			}
+			catch (SQLException e) {
+				// Expect this to happen 'cause Derby throws an SQL exception when it's shut down...
+			}
+		}
+		
 		public void initDb() throws SQLException {
+			DatabaseMetaData metaData = db.getMetaData();
 			Statement smt = db.createStatement();
-			smt.execute(SONG_HASHES_DEFN);
-			smt.execute(SONGS_DEFN);
-			smt.close();
+			
+			if (! metaData.getTables(null, null, "SONG_HASHES", null).next()) {
+				smt.execute(SONG_HASHES_DEFN);
+			}
+			if (! metaData.getTables(null, null, "SONGS", null).next()) {
+				smt.execute(SONGS_DEFN);
+			}
+			
+			db.setTransactionIsolation(Connection.TRANSACTION_READ_UNCOMMITTED);
+			db.setAutoCommit(false);
+			
+			// Cache songs. It's very cheap and we can avoid any concurrency issues
+			// by putting them in memory.
+			ResultSet songs = db.prepareStatement("SELECT * FROM SONGS").executeQuery();
+			
+			while (songs.next()) {
+				songCache.put(songs.getInt("ID"), songs.getString("NAME"));
+			}
+			
+			songs.close();
 		}
 		
 		public void createIndexes() throws SQLException {
 			indexStatement.execute();
+			db.commit();
 		}
 		
 		public synchronized void addSongToDb(SongMetaData song, StarHashSignature sig) throws SQLException {
 			insertSongStatement.setString(1, song.getName());
-			insertSongStatement.setString(2, "");
-			insertSongStatement.setString(3, "");
-			insertSongStatement.execute();
-			int id = getLastId();
+			insertSongStatement.executeUpdate();
+			ResultSet r = insertSongStatement.getGeneratedKeys();
+			r.next();
+			
+			int id = r.getInt(1);
+			
 			Map<Integer, Set<Integer>> hashes = sig.getStarHashes();
 
 			for (Integer hash : hashes.keySet()) {
@@ -114,19 +149,16 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 					insertHashesStatement.setInt(2, offset);
 					insertHashesStatement.setInt(3, id);
 					insertHashesStatement.execute();
-					
-					if (id < 1) {
-						throw new RuntimeException("getLastId() returned : " + id + "; should always be >= 1");
-					}
 				}
 			}
+			
+			db.commit();
 		}
 		
 		public void loadIntoMemory() throws SQLException {
 			ResultSet counts = db.prepareStatement("SELECT COUNT(*) FROM song_hashes").executeQuery();
 			counts.next();
 			int count = counts.getInt(1);
-			counts.close();
 			
 			ProgressNotifier notifier = progress.create("Loading hash offsets into memory...", count);
 			
@@ -136,13 +168,13 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 			int i = 0;
 			while (hashes.next()) {
 				// TODO: figure out what's going on here.
-				if (hashes.getInt("song_id") < 1) {
+				if (hashes.getInt("SONG_ID") < 1) {
 					System.err.println("Song ID for hash value is < 1 at row #" + i + " / " + count + ". This shouldn't happen: ("
 						+ hashes.getInt(1) + ","+hashes.getInt(2) + ","+hashes.getInt(3) + ")");
 				}
 				else {
-					cache.addFor(hashes.getInt("hash_value"),
-							Pair.create(hashes.getInt("song_id"), hashes.getInt("time_offset")));
+					cache.addFor(hashes.getInt("HASH_VALUE"),
+							Pair.create(hashes.getInt("SONG_ID"), hashes.getInt("TIME_OFFSET")));
 					notifier.update();
 				}
 				i++;
@@ -153,15 +185,21 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 		}
 		
 		public Map<Integer, ReconstructedStarHashSignature> getOffsetsByHashes(StarHashSignature sig) throws SQLException {
+			return getOffsetsByHashes(sig, false);
+		}
+		
+		public Map<Integer, ReconstructedStarHashSignature> getOffsetsByHashes(StarHashSignature sig, boolean quiet) throws SQLException {
 			ReconstructingMap songs = new ReconstructingMap();
 			
-			ProgressNotifier notifier = progress.create("Querying DB...", sig.getStarHashes().keySet().size());
-			int i = 1;
+			ProgressNotifier notifier = 
+				(quiet ? ProgressNotifier.nullNotifier()
+					  : progress
+					).create("Querying DB...", sig.getStarHashes().keySet().size());
 			
 			for (Integer hash : sig.getStarHashes().keySet()) {
 				songs.addHashes(hash, getMatchingHashes(hash));
 				
-				notifier.update(i++);
+				notifier.update();
 			}
 			
 			notifier.complete();
@@ -178,67 +216,54 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 			}
 			
 			return new SongMetaData(
-				results.getString("name"),
-				results.getString("name"),
+				results.getString("NAME"),
+				results.getString("NAME"),
 				id);
 		}
 		
-		public int getLastId() throws SQLException {
-			ResultSet results = getLastIdStatement.executeQuery();
-			results.next();
-			return results.getInt(1);
-		}
-		
 		protected Iterable<Pair<Integer, Integer>> getMatchingHashes(int hashValue) throws SQLException {
+			if (db.getAutoCommit()) {
+				db.setAutoCommit(false);
+			}
+			if (!db.isReadOnly()) {
+				db.setReadOnly(true);
+			}
+			
 			if (cache.containsKey(hashValue)) {
 				return cache.get(hashValue);
 			}
 			else if (! inMemory) {
-				findHashesStatement.setInt(1, hashValue);
-				return new HashResultIterator(findHashesStatement.executeQuery()); 
+				ResultSet rs = null;
+				synchronized (this) {
+					findHashesStatement.setInt(1, hashValue);
+					rs = findHashesStatement.executeQuery();
+					return new HashResultIterator(rs);
+				}
 			}
 			else {
 				return Collections.emptyList();
 			}
 		}
 		
-		protected static class HashResultIterator implements Iterable<Pair<Integer, Integer>>, Iterator<Pair<Integer,Integer>> {
-			private final ResultSet results;
+		protected static class HashResultIterator implements Iterable<Pair<Integer, Integer>> {
+			private List<Pair<Integer,Integer>> items;
 
-			public HashResultIterator(ResultSet results) {
-				this.results = results;
+			public HashResultIterator(ResultSet results) throws SQLException {
+				this.items = new LinkedList<Pair<Integer,Integer>>();
 				
-			}
-
-			@Override
-			public boolean hasNext() {
-				try {
-					return results.next();
+				while (results.next()) {
+					items.add(Pair.create(
+						results.getInt("SONG_ID"),
+						results.getInt("TIME_OFFSET")));
 				}
-				catch (SQLException e) {
-					throw new RuntimeException(e);
-				}
-			}
-
-			@Override
-			public Pair<Integer, Integer> next() {
-				try {
-					return Pair.create(results.getInt("song_id"), results.getInt("time_offset"));
-				} catch (SQLException e) {
-					throw new RuntimeException(e);
-				}
-			}
-
-			@Override
-			public void remove() {
-				throw new UnsupportedOperationException();
+				
+				results.close();
 			}
 
 			@Override
 			public Iterator<Pair<Integer, Integer>> iterator() {
-				return this;
+				return items.iterator();
 			}
-			
 		}
 		
 		protected static class ReconstructingMap extends DefaultingHashMap<Integer, ReconstructedStarHashSignature> {
@@ -328,6 +353,11 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 			throw new RuntimeException(e);
 		}
 	}
+	
+	@Override
+	public void shutdown() {
+		dbHelper.shutdown();
+	}
 
 	/**
 	 * Does the same thing as {@link #findSong(StarHashSignature)}, but outputs the histograms used to
@@ -341,9 +371,10 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 	 * @throws SQLException
 	 */
 	public QueryResponse<StarHashSignature> findSongWithDebugInfo(StarHashSignature signature,
-		File histogramOutputDir) throws SQLException {
+		File histogramOutputDir,
+		boolean quiet) throws SQLException {
 		
-		Map<Integer, ReconstructedStarHashSignature> offsetsByHashes = dbHelper.getOffsetsByHashes(signature);
+		Map<Integer, ReconstructedStarHashSignature> offsetsByHashes = dbHelper.getOffsetsByHashes(signature, quiet);
 		
 		// Choose the best.
 		double bestScore = Double.NEGATIVE_INFINITY;

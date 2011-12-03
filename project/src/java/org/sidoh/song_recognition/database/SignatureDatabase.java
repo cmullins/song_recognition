@@ -72,6 +72,8 @@ public abstract class SignatureDatabase<T extends Signature> implements Serializ
 				finally {
 					System.out.println("Shutting down worker pool...");
 					workerPool.shutdown();
+					System.out.println("Shutting down database...");
+					shutdown();
 				}
 			}
 		}, "Worker pool shutdown action");
@@ -84,6 +86,7 @@ public abstract class SignatureDatabase<T extends Signature> implements Serializ
 	 * @param song
 	 */
 	public final void addSong(final SongMetaData song, final T sig) {
+// This is causing memory issues...
 //		workerPool.execute(new Runnable() {
 //			@Override
 //			public void run() {
@@ -108,6 +111,15 @@ public abstract class SignatureDatabase<T extends Signature> implements Serializ
 	 * @param sig
 	 */
 	protected abstract void addSongInner(SongMetaData song, T sig);
+	
+	/**
+	 * This method is called automatically when the thread that created 
+	 * this DB exits. Calling it again shouldn't do any harm. The default
+	 * is noop.
+	 */
+	public void shutdown() {
+		
+	}
 	
 	/**
 	 * 

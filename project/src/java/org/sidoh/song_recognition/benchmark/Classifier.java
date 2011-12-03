@@ -6,7 +6,7 @@ import java.sql.SQLException;
 import org.sidoh.io.ProgressNotifier;
 import org.sidoh.song_recognition.audio_io.FrameBuffer;
 import org.sidoh.song_recognition.audio_io.WavFileException;
-import org.sidoh.song_recognition.database.H2Helper;
+import org.sidoh.song_recognition.database.RdbmsHelper;
 import org.sidoh.song_recognition.database.HashSignatureDatabase;
 import org.sidoh.song_recognition.database.SignatureDatabase.QueryResponse;
 import org.sidoh.song_recognition.signature.HistogramScorer;
@@ -30,7 +30,7 @@ public class Classifier {
 		;
 		
 		HashSignatureDatabase db = new HashSignatureDatabase(
-				H2Helper.getConnection(args[0]), settings);
+				RdbmsHelper.getH2Connection(args[0]), settings);
 		db.loadIntoMemory();
 		
 		StarHashExtractor extractor = settings.getStarHashExtractor();

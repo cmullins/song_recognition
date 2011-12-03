@@ -18,7 +18,7 @@ public class BulkDbBuilder {
 		}
 		
 		HashSignatureDatabase db = new HashSignatureDatabase(
-				H2Helper.getConnection(args[0]),
+				RdbmsHelper.getConnection(args[0]),
 				settings);
 		WavDatabaseBuilder<StarHashSignature, HashSignatureDatabase> dbBuilder
 			= new WavDatabaseBuilder<StarHashSignature, HashSignatureDatabase>(

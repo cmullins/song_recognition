@@ -120,7 +120,7 @@ public class Settings implements Serializable {
 	 * hashing.
 	 */
 	private Region.Builder regionBuilder
-		= Region.rectangularRegion(100, -15, 30, 500);
+		= Region.rectangularRegion(100, -3, 2, 500);
 	
 	/**
 	 * This performs the same function as {@link #regionBuilder}, but is used when

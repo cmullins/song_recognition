@@ -31,7 +31,7 @@ import org.sidoh.song_recognition.audio_io.WavFileException;
 import org.sidoh.song_recognition.benchmark.report.Report;
 import org.sidoh.song_recognition.benchmark.report.ReportEntry;
 import org.sidoh.song_recognition.benchmark.report.ReportServer;
-import org.sidoh.song_recognition.database.H2Helper;
+import org.sidoh.song_recognition.database.RdbmsHelper;
 import org.sidoh.song_recognition.database.HashSignatureDatabase;
 import org.sidoh.song_recognition.database.SignatureDatabase.QueryResponse;
 import org.sidoh.song_recognition.database.SongMetaData;
@@ -78,14 +78,17 @@ public class BulkTest {
 			dbFile = new File(ClOptions.DATABASE.value(cmd));
 			
 			if (!dbFile.exists()) {
-				File testFile = new File(String.format("%s.h2.db", ClOptions.DATABASE.value(cmd)));
+				// Check for files beginning with the prefix
+				boolean found = false;
+				for (File f : dbFile.getParentFile().listFiles()) {
+					if (f.getName().startsWith(dbFile.getName())) {
+						found = true;
+					}
+				}
 				
-				if (!testFile.exists()) {
+				if (!found) {
 					throw new IOException("Specified database file: " + ClOptions.DATABASE.value(cmd) + " doesn't exist!");
 				}
-			}
-			else {
-				dbFile = new File(dbFile.getAbsolutePath().substring(0,dbFile.getAbsolutePath().length()-6));
 			}
 			
 			reportPath = new File(ClOptions.REPORT_PATH.value(cmd));
@@ -316,7 +319,7 @@ public class BulkTest {
 		
 		// Set up the database
 		HashSignatureDatabase db = new HashSignatureDatabase(
-			H2Helper.getConnection(options.getDbFile().getAbsolutePath()),
+			RdbmsHelper.getConnection(options.getDbFile().getAbsolutePath()),
 			settings.getProgressNotifer(),
 			settings);	
 		// Load into memory if we're told to
@@ -427,7 +430,7 @@ public class BulkTest {
 	
 	// Need a separate builder so it has its own memory buffer that it can use. Otherwise we'll
 	// get all sorts of weirdness and almost definitely nothing close to what we want.
-	private static Spectrogram.Builder workerSpecBuilder = Spectrogram.inMemory();
+	private static Spectrogram.Builder workerSpecBuilder = Spectrogram.inMemory().progressNotifier(ProgressNotifier.nullNotifier());
 	
 	// Keep a copy of this around so we don't have to create it a bunch of times.
 	private static SpectrogramWriter spectrogramWriter = null;
@@ -445,7 +448,7 @@ public class BulkTest {
 		
 		if (spectrogramWriter == null) {
 			spectrogramWriter = new PgmSpectrogramConstellationWriter(
-					settings.getConstellationExtractor(),
+					settings.getConstellationExtractor().quiet(),
 					ProgressNotifier.nullNotifier());
 		}
 		
@@ -496,7 +499,7 @@ public class BulkTest {
 					entry.setSpectrogram(IOHelper.getRelativePath(clOptions.getReportPath(), new File(pngFile)));
 					
 					// Query DB and ask it to enable debug info
-					db.findSongWithDebugInfo(sig, outputDir);
+					db.findSongWithDebugInfo(sig, outputDir, true);
 					
 					// Find any .txt files the previous method call may have found and run an R script on them.
 					List<String> convertedHistFiles = new ArrayList<String>();

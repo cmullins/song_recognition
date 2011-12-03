@@ -16,7 +16,7 @@ public class InteractiveDbBuilder {
 		
 		Settings settings = Settings.defaults();
 		File dbFile = StdinPrompts.promptForFile("Please enter file to save DB to. If it exists, it will be loaded.", false, false);
-		db = new HashSignatureDatabase(H2Helper.getConnection(dbFile.getAbsolutePath()), settings);
+		db = new HashSignatureDatabase(RdbmsHelper.getConnection(dbFile.getAbsolutePath()), settings);
 
 		System.out.println("DB Loaded!");
 		System.out.println();

@@ -25,7 +25,7 @@ public class ReportServer {
 			"<script type=\"text/javascript\" src=\"https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/jquery-ui.min.js\"></script>";
 		
 		// TODO: I'm a terrible person.
-		public static final File staticFilePath = new File("/Users/chris/src/663_pattern_recognition/project/src/html");
+		public static final File staticFilePath = new File("/Users/chris/src/663_pattern_recognition/project/src/html/report_server");
 	}
 	
 	private final Report report;
