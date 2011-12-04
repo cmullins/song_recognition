@@ -24,7 +24,7 @@ public class SdsFromMeanAndHeightScorer extends HistogramScorer {
 
 	@Override
 	public double score(Histogram hist) {
-		Map<Integer, List<Double>> values = hist.getValues();
+		Map<Integer, Integer> values = hist.getValues();
 
 		// Punt unless there are at least a few buckets to consider.
 		if (values.size() < 5) {
@@ -39,7 +39,7 @@ public class SdsFromMeanAndHeightScorer extends HistogramScorer {
 				.create();
 		
 		for (Integer bin : values.keySet()) {
-			topN.add(values.get(bin).size());
+			topN.add(values.get(bin));
 		}
 		
 		// Pop the max because it shouldn't be included in the mean. Will skew results.

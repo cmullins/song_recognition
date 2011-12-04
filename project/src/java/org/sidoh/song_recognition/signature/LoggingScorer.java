@@ -30,8 +30,8 @@ public class LoggingScorer extends HistogramScorer {
 			String file = String.format("%s_%.5f.txt", filename, answer);
 			PrintStream out = new PrintStream(new BufferedOutputStream(new FileOutputStream(file)));
 			
-			for (Entry<Integer, List<Double>> entry : hist.getValues().entrySet()) {
-				out.printf("%d\t%d\n", entry.getKey(), entry.getValue().size());
+			for (Entry<Integer, Integer> entry : hist.getValues().entrySet()) {
+				out.printf("%d\t%d\n", entry.getKey(), entry.getValue());
 			}
 			
 			out.close();

@@ -18,7 +18,6 @@ import java.util.Set;
 
 import org.sidoh.collections.DefaultingHashMap;
 import org.sidoh.collections.HashOfSets;
-import org.sidoh.collections.Pair;
 import org.sidoh.collections.TreeMapOfSets;
 import org.sidoh.io.ProgressNotifier;
 import org.sidoh.io.ProgressNotifier.Builder;
@@ -67,8 +66,51 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 		
 		private final int timeResolution;
 		private final ProgressNotifier.Builder progress;
+		
+		protected static class CacheEntry {
+			int timeOffset;
+			byte songId;
+			
+			public CacheEntry(int timeOffset, int songId) {
+				this.timeOffset = timeOffset;
+				this.songId     = (byte)songId;
+			}
+			
+			public int getTimeOffset() {
+				return timeOffset;
+			}
+			
+			public int getSongId() {
+				return songId;
+			}
 
-		private HashOfSets<Integer, Pair<Integer, Integer>> cache;
+			@Override
+			public int hashCode() {
+				final int prime = 31;
+				int result = 1;
+				result = prime * result + songId;
+				result = prime * result + timeOffset;
+				return result;
+			}
+
+			@Override
+			public boolean equals(Object obj) {
+				if (this == obj)
+					return true;
+				if (obj == null)
+					return false;
+				if (getClass() != obj.getClass())
+					return false;
+				CacheEntry other = (CacheEntry) obj;
+				if (songId != other.songId)
+					return false;
+				if (timeOffset != other.timeOffset)
+					return false;
+				return true;
+			}
+		}
+
+		private HashOfSets<Integer, CacheEntry> cache;
 		private Map<Integer, String> songCache;
 
 		private boolean inMemory = false;
@@ -77,7 +119,7 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 			this.db = db;
 			this.timeResolution = timeResolution;
 			this.progress = progress;
-			this.cache = new HashOfSets<Integer, Pair<Integer, Integer>>();
+			this.cache = new HashOfSets<Integer, CacheEntry>();
 			this.songCache = new HashMap<Integer, String>();
 			
 			initDb();
@@ -162,7 +204,7 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 			
 			ProgressNotifier notifier = progress.create("Loading hash offsets into memory...", count);
 			
-			this.cache = new HashOfSets<Integer, Pair<Integer, Integer>>((int)Math.floor(2*count));
+			this.cache = new HashOfSets<Integer, CacheEntry>((int)Math.floor(2*count));
 			
 			ResultSet hashes = db.prepareStatement("SELECT * FROM song_hashes").executeQuery();
 			int i = 0;
@@ -174,7 +216,7 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 				}
 				else {
 					cache.addFor(hashes.getInt("HASH_VALUE"),
-							Pair.create(hashes.getInt("SONG_ID"), hashes.getInt("TIME_OFFSET")));
+							new CacheEntry(hashes.getInt("TIME_OFFSET"), hashes.getInt("SONG_ID")));
 					notifier.update();
 				}
 				i++;
@@ -182,6 +224,7 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 			notifier.complete();
 			
 			this.inMemory = true;
+			shutdown();
 		}
 		
 		public Map<Integer, ReconstructedStarHashSignature> getOffsetsByHashes(StarHashSignature sig) throws SQLException {
@@ -208,24 +251,32 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 		}
 		
 		public SongMetaData getSongById(int id) throws SQLException {
-			findSongStatement.setInt(1, id);
-			ResultSet results = findSongStatement.executeQuery();
-			
-			if (! results.next()) {
-				throw new RuntimeException("Coulding find song with ID = " + id + "!");
+			String name;
+			if (songCache.containsKey(id)) {
+				name = songCache.get(id);
+			}
+			else if (! db.isClosed()) {
+				findSongStatement.setInt(1, id);
+				ResultSet results = findSongStatement.executeQuery();
+				
+				if (! results.next()) {
+					throw new RuntimeException("Coulding find song with ID = " + id + "!");
+				}
+				
+				name = results.getString("NAME");
+			}
+			else {
+				throw new RuntimeException("DB is closed and song with id `" + id + "' isn't cached!");
 			}
 			
-			return new SongMetaData(
-				results.getString("NAME"),
-				results.getString("NAME"),
-				id);
+			return new SongMetaData(name, name, id);
 		}
 		
-		protected Iterable<Pair<Integer, Integer>> getMatchingHashes(int hashValue) throws SQLException {
-			if (db.getAutoCommit()) {
+		protected Iterable<CacheEntry> getMatchingHashes(int hashValue) throws SQLException {
+			if (!db.isClosed() && db.getAutoCommit()) {
 				db.setAutoCommit(false);
 			}
-			if (!db.isReadOnly()) {
+			if (!db.isClosed() && !db.isReadOnly()) {
 				db.setReadOnly(true);
 			}
 			
@@ -245,23 +296,23 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 			}
 		}
 		
-		protected static class HashResultIterator implements Iterable<Pair<Integer, Integer>> {
-			private List<Pair<Integer,Integer>> items;
+		protected static class HashResultIterator implements Iterable<CacheEntry> {
+			private List<CacheEntry> items;
 
 			public HashResultIterator(ResultSet results) throws SQLException {
-				this.items = new LinkedList<Pair<Integer,Integer>>();
+				this.items = new LinkedList<CacheEntry>();
 				
 				while (results.next()) {
-					items.add(Pair.create(
-						results.getInt("SONG_ID"),
-						results.getInt("TIME_OFFSET")));
+					items.add(new CacheEntry(
+						results.getInt("TIME_OFFSET"),
+						results.getInt("SONG_ID")));
 				}
 				
 				results.close();
 			}
 
 			@Override
-			public Iterator<Pair<Integer, Integer>> iterator() {
+			public Iterator<CacheEntry> iterator() {
 				return items.iterator();
 			}
 		}
@@ -271,7 +322,7 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 
 			@Override
 			protected ReconstructedStarHashSignature getDefaultValue() {
-				return new ReconstructedStarHashSignature(new TreeMapOfSets<Integer, Integer>());
+				return new ReconstructedStarHashSignature(new HashOfSets<Integer, Integer>());
 			}
 			
 			@Override
@@ -285,14 +336,14 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 				return value;
 			}
 			
-			protected void addHashes(int hash, Iterable<Pair<Integer, Integer>> vals) {
-				for (Pair<Integer, Integer> val : vals) {
-					addHash(val.getV1(), hash, val.getV2());
+			protected void addHashes(int hash, Iterable<CacheEntry> vals) {
+				for (CacheEntry val : vals) {
+					addHash(val.getSongId(), hash, val.getTimeOffset());
 				}
 			}
 			
 			protected void addHash(int song, int hash, int offset) {
-				((TreeMapOfSets<Integer, Integer>)this.get(song).getStarHashes()).addFor(hash, offset);
+				((HashOfSets<Integer, Integer>)this.get(song).getStarHashes()).addFor(hash, offset);
 			}
 			
 		}

@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en"> 
+	<head> 
+		<meta http-equiv="content-type" content="text/html; charset=UTF-8" /> 
+		<link rel="stylesheet" type="text/css" href="main.css" /> 
+		<link rel="stylesheet" type="text/css" href="jquery.tooltip.css" />
+		<link rel="stylesheet" type="text/css" href="jquery-ui.css" />
+		<script type="text/javascript" src="jquery.min.js"></script>
+		<script type="text/javascript" src="jquery-ui.min.js"></script>
+		<script type="text/javascript" src="jquery.tooltip.js"></script>
+		<script type="text/javascript" src="jquery.simplemodal.1.4.1.min.js"></script>
+		<title>Twiddle with settings!</title> 
+	</head> 
+
+<body>
+<script type="text/javascript">
+var id = 0;
+var activeSongs = {};
+var loadedImages = {};
+var init = true;
+
+// Position and resize stuff based on the window height/width
+function resizeElements() {
+	// Compute the max height so that the settings fit on the screen
+	$('#song-list').height($(window).height() - $('#settings-container-inner').height() - 200);
+};
+
+// Populate the song list given an array of songs
+function populateSongList(json) {
+	var elmt = $('#song-list');
+
+	for (var i in json) {
+		var name = json[i]['name'];
+		var path = json[i]['path'];
+		var html = '<div class="draggable-song" data-name="' + name + '" data-path="' + path + '">';
+
+		html += '<div class="text">' + name + '</div>';
+		html += '</div>';
+
+		elmt.append(html);
+	}
+
+	$('.draggable-song').draggable({ 
+		appendTo: 'body',
+		containment: 'window',
+		scroll: false,
+		helper: 'clone'
+	});
+};
+
+function handleSongDrop(elmt) {
+	var name = elmt.attr('data-name');
+	var path = elmt.attr('data-path'); 
+
+	if (!(activeSongs[path] >= 0)) {
+		var elmtId = id++;
+		addSong(name, path);
+		activeSongs[path] = elmtId;
+	}
+	else {
+		alert('You already have that song in the test list!');
+	}
+};
+
+function addSong(name, path) {
+	if ($('#testing-songs-container').attr('data-init') == 1) {
+		$('#testing-songs-container').html('').attr('data-init', 0);
+	}
+
+	var html = '<div class="test-song" data-path="' + path + '"><div class="header4">' + name + '</div>';
+	html += '<div class="test-song-inner" data-loaded="0" id="test-song-' + id + '">Loading...</div>'
+	html += '</div>';
+
+	$('#testing-songs-container').append(html);
+
+	$.ajax('/commands/add-song?path=' + path + '&name=' + name, {
+		dataType : 'json',
+		type     : 'get',
+		cache    : false
+	});
+};
+
+function getId(path) {
+	if (! activeSongs[path]) {
+		activeSongs[path] = id++;
+	}
+	return activeSongs[path];
+};
+
+function renderImageControls(elmt) {
+	var imgs = $('.spec-img-container', elmt);
+
+	if (elmt.attr('data-rendered') != 1) {
+		elmt.attr('data-rendered', 1);
+		var imgs = imgs.hide();
+
+		var ctrl = $('<div class="img-slider"></div>');
+		ctrl.slider({
+			min    : 1,
+			max    : imgs.length,
+			slide  : function(event,ui) { updateImgArea($(this),ui.value); }
+		});
+		ctrl.insertBefore(elmt);
+		$('<span class="slider-value-text">(1 / ' + imgs.length + ')</span>').insertAfter(ctrl);
+
+		imgs.first().show();
+	}
+	else {
+		var slider = elmt.prev().prev();
+		var activeId = getActiveValue(slider);
+
+		slider.slider({
+			min   : 1,
+			max   : imgs.length,
+			value : activeId,
+			slide : function(event,ui) { updateImgArea($(this),ui.value); }
+		});
+
+		updateImgArea(slider, -1);
+		imgs.last().hide();
+	}
+};
+
+function getActiveValue(slider) {
+	var val = $('.spec-img-container:visible', slider.next().next()).attr('data-id');
+
+	if (val) {
+		return val;
+	}
+	else {
+		return 1;
+	}
+};
+
+function updateImgArea(slider, val) {
+	if (val != -1) {
+		var elmt = $('.spec-img-container', slider.next().next())
+			.hide()
+			.eq(val-1);
+
+		elmt.show().scrollTop($('img', elmt).height());
+	}
+	else {
+		val = getActiveValue(slider);
+	}
+	slider.next().html('(' + val + ' / ' + slider.slider('option', 'max') + ')');
+};
+
+function refreshImages() {
+	$.ajax('/images', {
+		dataType : 'json',
+		type     : 'get',
+		cache    : false,
+		success  : function(allImages) {
+			for (var ix in allImages) {
+				var song = allImages[ix];
+				var name = song['name'];
+				var path = song['path'];
+
+				var elmt = $('.test-song').filter(function() { return $(this).attr('data-path') == song['path'] });
+		
+				if (elmt.length == 0) {
+					addSong(name, path);
+					elmt =  $('.test-song').last();
+				}
+
+				var inner = $('.test-song-inner', elmt);
+				for (var i in song['images']) {
+					var img = song['images'][i];
+
+					if (! loadedImages[img]) {
+						loadedImages[img] = 1;
+						if (inner.attr('data-loaded') == 0) {
+							inner.html('');
+							inner.attr('data-loaded', 1);
+						}
+
+						inner.append('<div class="spec-img-container" data-id="' + 
+							($('.spec-img-container',inner).length+1) + '">'+
+							'<img src="/spectrograms/' + img + '" /></div>');
+						$('img', inner).addClass('spec-img').load(function() {
+							$(this).parent().scrollTop($(this).height());
+							$(this).parent().width($(this).parent().parent().width());
+						});
+						if (!init) {
+							inner.effect("highlight", {}, 3000);
+						}
+
+						renderImageControls(inner);
+					}
+				}
+			}
+
+			if (init) {
+				init = false;
+			}
+
+			setTimeout(refreshImages, 5000);
+		}
+	});
+};
+
+function applySettings(settings) {
+	var staticSettings = ['frame-size', 'frame-overlap', 'window-size', 'n-sds', 'peak-density'];
+	var radio  = ['peak-algorithm', 'peak-retention'];
+
+	for (var i in staticSettings) {
+		var key = staticSettings[i];
+		$('#' + key).val(settings[key]);
+	}
+
+	for (var i in radio) {
+		var key = radio[i];
+		$(':radio[name="' + key + '"]')
+			.filter('[value="' + settings[key] + '"]')
+			.attr('checked', true);
+	}
+
+	updatePeakAlgorithms();
+
+	// Special: jQuery-UI elements, etc.
+	var windowWidth = settings['window-size'];
+	$('#window-size').slider("value", windowWidth);
+
+	// Need to bind a change event handler for slider. If it's set before settings
+	// are loaded it gets triggered when we set it.
+	$('#window-size').bind("slidechange", function() { handleUpdateSetting($(this)); });
+};
+
+function updatePeakAlgorithms() {
+	var clickedVal = $(':radio[name="peak-algorithm"]').filter(':checked').val();
+
+	$('.peak-algorithm-params').hide().each(function() {
+		if ($(this).attr('data-for') == clickedVal) {
+			$(this).show();
+		}
+	});
+};
+
+function handleUpdateSetting(obj) {
+	var key;
+	if (obj.attr('id')) {
+		key = obj.attr('id');
+	} 
+	else {
+		key = obj.attr('name');
+	}
+
+	var val;
+	if (key == "window-size") {
+		val = obj.slider("value");
+	}
+	else {
+		val = obj.val();
+	}
+
+	$.ajax('/update-setting/' + key + '/' + val, {
+		type : 'get',
+		cache : false
+	});
+};
+
+$(function() {
+	// Load list of songs from the server
+	$.ajax('/settings/song-list', {
+		dataType : 'json',
+		type     : 'get',
+		cache    : false,
+		success  : function(data) { populateSongList(data); }
+	});
+
+	// Handle dynamic hiding of peak detection algorithm parameter areas
+	$('.peak-algorithm-params').hide();
+	$(':radio[name="peak-algorithm"]').change(updatePeakAlgorithms);
+
+	// Set up jQuery-UI elements
+	$('#window-size').slider({
+		min    : 20,
+		max    : 2000
+	});
+
+	// Set up droppable zone
+	$('#testing-songs-container').droppable({
+		over : function() { $(this).addClass('songs-container-active'); },
+		out  : function() { $(this).removeClass('songs-container-active'); },
+		drop : function(event, ui) { $(this).removeClass('songs-container-active'); handleSongDrop(ui.draggable); }
+	});
+
+	// Handle the resizing stuff
+	$(window).resize(function() { resizeElements(); });
+	resizeElements();
+
+	// Set up image refresher
+	refreshImages();
+
+	// Load settings from the server
+	$.ajax('/settings', {
+		dataType : 'json',
+		type     : 'get',
+		cache    : false,
+		success  : function(data) { applySettings(data); }
+	});
+
+	// Set up handler to inform server of settings changes
+	$('.setting').change(function() { handleUpdateSetting($(this)); });
+});
+</script>
+<div id="settings-container">
+	<div class="header">Clips to Test</div>
+	<div class="table-contents">
+		<div id="song-list"></div>
+	</div>
+	<div class="header">Setings</div>
+	<div class="table-contents" id="settings-container-inner">
+		<div class="header3"> FFT Settings </div>
+		<div class="field-container">
+			<div class="field-label"> Frame size (must be power of 2) </div>
+			<input type="text" class="setting small-input" id="frame-size" />
+		</div>
+		<div class="field-container">
+			<div class="field-label"> Frame overlap (0 &lt;= x &lt; 1) </div>
+			<input type="text" class="setting small-input" id="frame-overlap" />
+		</div>
+
+		<div> &nbsp; </div>
+		<div class="header3"> Peak Detection Algorithm </div>
+		<input type="radio" class="setting" name="peak-algorithm" value="n-sds" /> N SDs Above Mean <br />
+		<input type="radio" class="setting" name="peak-algorithm" value="max" /> Max in window <br />
+		<div>&nbsp;</div>
+		<div class="header4">Parameters: </div>
+		Window Size <br />
+		<div id="window-size" class="setting" style="margin: 5px;"></div>
+		<div class="peak-algorithm-params" data-for="n-sds">
+			Num SDs: 
+			<input type="text" id="n-sds" class="setting small-input" />
+		</div>
+
+		<div> &nbsp; </div>
+		<div class="header3"> Peak Retention Method </div>
+		<div>
+			Density factor:
+			<input type="text" id="peak-density" class="setting small-input" />
+		</div>
+		<input type="radio" class="setting" name="peak-retention" value="coordinate-agnostic"> Coordinate agnostic <br />
+		<input type="radio" class="setting" name="peak-retention" value="even-time"> Evenly spread in time <br />
+		<input type="radio" class="setting" name="peak-retention" value="even-frequency"> Evenly spread in frequency <br />
+	</div>
+</div>
+</div>
+</div>
+
+<div id="content-container">
+	<div class="header"> Songs to Test </div>
+	<div class="table-contents">
+	<div id="testing-songs-container" data-init="1">
+		<div style="text-align: center; font-style: italic;"> (Drag songs here to test them) </div>
+	</div>
+	</div>
+</div>
+</body>
+</html>

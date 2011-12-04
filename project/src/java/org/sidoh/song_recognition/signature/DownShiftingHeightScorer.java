@@ -41,8 +41,8 @@ public class DownShiftingHeightScorer extends HistogramScorer {
 				.maximumSize(size)
 				.create();
 		
-		for (Collection<Double> bucket : hist.getValues().values()) {
-			pq.add(bucket.size());
+		for (int bucketSize : hist.getValues().values()) {
+			pq.add(bucketSize);
 		}
 		
 		pq.poll();

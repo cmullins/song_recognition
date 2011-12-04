@@ -28,27 +28,11 @@ public abstract class HistogramScorer implements Serializable {
 		return new HeightProbabilityScorer();
 	}
 	
-	public static HistogramScorer sdsFromMeanAndHeight(int heightSig) {
-		return new SdsFromMeanAndHeightScorer(heightSig);
-	}
-	
 	public static HistogramScorer sdsFromMean() {
 		return new SdsFromMeanScorer();
 	}
 	
 	public static HistogramScorer sizeScorer() {
 		return new SizeScorer();
-	}
-	
-	public static HistogramScorer timesLargerThanNthPercentile(double percentile) {
-		return new NumTimesLargerThanNthPercentileHistogramScorer(percentile);
-	}
-	
-	public static HistogramScorer downshiftingHeightScorer(double percentile, boolean defaultTo2) {
-		return new DownShiftingHeightScorer(percentile, defaultTo2);
-	}
-	
-	public static HistogramScorer entropyScorer() {
-		return new EntropyScorer();
 	}
 }

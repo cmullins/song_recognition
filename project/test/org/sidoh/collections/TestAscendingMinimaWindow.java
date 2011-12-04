@@ -1,8 +1,6 @@
 package org.sidoh.collections;
 
-import static org.junit.Assert.*;
-
-import java.util.Collections;
+import static org.junit.Assert.assertEquals;
 
 import org.junit.Test;
 

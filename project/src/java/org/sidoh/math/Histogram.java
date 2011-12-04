@@ -1,12 +1,10 @@
 package org.sidoh.math;
 
-import java.util.Collections;
-import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 
-import org.sidoh.collections.HashOfLists;
-
-import com.google.common.collect.MinMaxPriorityQueue;
+import org.sidoh.collections.BufferedCountingMap;
+import org.sidoh.collections.Pair;
 
 /**
  * Puts doubles into bins of integers.
@@ -15,106 +13,46 @@ import com.google.common.collect.MinMaxPriorityQueue;
  *
  */
 public class Histogram {
-	private HashOfLists<Integer, Double> values;
-	private int maxCount;
-	private int minCount;
-	private int maxBin;
-	private int minBin;
-	private int total;
-	
+	private BufferedCountingMap values;
+
 	public Histogram(int maxValues) {
-		maxCount = 0;
-		minCount = Integer.MAX_VALUE;
-		maxBin = -1;
-		minBin = -1;
-		total = 0;
-		values = new HashOfLists<Integer, Double>(2*maxValues);
+		this.values = new BufferedCountingMap(maxValues);
 	}
 	
 	public void addValue(double value) {
 		int bin = (int)Math.floor(value);
-		values.addFor(bin, value);
-		int size = values.get(bin).size();
-		
-		if (size > maxCount) {
-			maxCount = size;
-			maxBin   = bin;
-		}
-		if (size < minCount) {
-			minCount = size;
-			minBin   = bin;
-		}
-		
-		total++;
-	}
-
-	public Map<Integer, List<Double>> getValues() {
-		return values;
+		values.increment(bin);
 	}
 
 	public int getMaxCount() {
-		return maxCount;
+		return values.getMaxCount();
 	}
 
 	public int getMinCount() {
-		return minCount;
-	}
-
-	public int getMaxBin() {
-		return maxBin;
-	}
-
-	public int getMinBin() {
-		return minBin;
+		return values.getMinCount();
 	}
 
 	public int getTotal() {
-		return total;
+		return (int)values.getCountsSum();
 	}
 	
 	public double meanCount() {
-		return total / (double)(values.size());
+		return values.getMeanCount();
 	}
 	
 	public double sdCount() {
-		int sum = 0;
-		int sq  = 0;
-		
-		for (List<Double> bin : values.values()) {
-			sum += bin.size();
-			sq  += bin.size()*bin.size();
-		}
-		
-		int n = values.size();
-		
-		return Math.sqrt(
-				((n*sq) - sum*sum)
-					/
-				(double)(n*(n-1)));
+		return values.getCountSd();
 	}
 	
 	public int getNumBins() {
-		return values.size();
+		return values.getNumBins();
 	}
 	
-	public double getNthPercentileMean(double p) {
-		int size = (int)Math.floor(p*values.size());
-		size = Math.max(2, size);
-		MinMaxPriorityQueue<Integer> topN
-			= MinMaxPriorityQueue
-				.orderedBy(Collections.reverseOrder())
-				.maximumSize(size)
-				.create();
-		
-		for (Integer bin : values.keySet()) {
-			topN.add(values.get(bin).size());
+	public Map<Integer, Integer> getValues() {
+		Map<Integer, Integer> r = new HashMap<Integer, Integer>();
+		for (Pair<Integer,Integer> p : values.getEntries()) {
+			r.put(p.getV1(), p.getV2());
 		}
-		
-		double sum = 0d;
-		for (Integer binSize : topN) {
-			sum += binSize;
-		}
-		
-		return sum/size;
+		return r;
 	}
 }

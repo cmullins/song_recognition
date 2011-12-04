@@ -40,6 +40,28 @@ public class Stats {
 	
 	/**
 	 * 
+	 * @param n
+	 * @param sum
+	 * @param sqSum
+	 * @return
+	 */
+	public static double variance(int n, double sum, double sqSum) {
+		return (n*sqSum - sum*sum) / (n * (n-1));
+	}
+	
+	/**
+	 * 
+	 * @param n
+	 * @param sum
+	 * @param sqSum
+	 * @return
+	 */
+	public static double sd(int n, double sum, double sqSum) {
+		return Math.sqrt(variance(n,sum,sqSum));
+	}
+	
+	/**
+	 * 
 	 * @param a
 	 * @return
 	 */

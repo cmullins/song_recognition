@@ -4,6 +4,7 @@ import java.io.Serializable;
 
 import org.sidoh.io.ProgressNotifier;
 import org.sidoh.peak_detection.StatefulPeakDetector;
+import org.sidoh.peak_detection.StatefulSdsFromMeanPeakDetector;
 import org.sidoh.song_recognition.audio_io.FrameBuffer;
 import org.sidoh.song_recognition.audio_io.WavFile;
 import org.sidoh.song_recognition.signature.ConstellationMapExtractor;
@@ -46,7 +47,7 @@ public class Settings implements Serializable {
 	/**
 	 * This controls how many peaks are kept from each song
 	 */
-	private double starDensityFactor = 0.3d;
+	private double starDensityFactor = 0.2d;
 	
 	/**
 	 * Controls how granular time is in signatures, etc.
@@ -60,7 +61,7 @@ public class Settings implements Serializable {
 	 * results in more space taken for hash values, and more time taken for
 	 * computing matches (and more memory taken for the spectrogram).
 	 */
-	private double frameOverlap = 0.25d;
+	private double frameOverlap = 0.05d;
 	
 	/**
 	 * This defines the number of samples in a frame. The higher the number,
@@ -68,7 +69,7 @@ public class Settings implements Serializable {
 	 * be. Note that due to restrictions in the DCT, this must be a power of 
 	 * two.
 	 */
-	private int frameSize = 1024;
+	private int frameSize = 512;
 	
 	/**
 	 * Responsible for building transform functions. 
@@ -85,12 +86,22 @@ public class Settings implements Serializable {
 		= Spectrogram.singletonStorage().progressNotifier(progressNotifer).transformBuilder(transformBuilder);
 	
 	/**
+	 * Window size for peak detector
+	 */
+	private int windowSize = 250;
+	
+	/**
+	 * Num SDs above mean.
+	 */
+	private double nSdsAboveMean = 3;
+	
+	/**
 	 * Peak detection algorithm to use. Because of the way spectrograms are 
 	 * processed, we require a {@link StatefulPeakDetector}. This prevents making
 	 * large memory buffers necessary.
 	 */
 	private StatefulPeakDetector.Builder peakDetector
-		= StatefulPeakDetector.sdsFromMean(200, 3);
+		= StatefulPeakDetector.sdsFromMean(windowSize, nSdsAboveMean);
 
 	/**ll usually involve some calculation
 	 * using {@link #starDensityFactor}.
@@ -120,7 +131,7 @@ public class Settings implements Serializable {
 	 * hashing.
 	 */
 	private Region.Builder regionBuilder
-		= Region.rectangularRegion(100, -3, 2, 500);
+		= Region.rectangularRegion(100, -3, 10, 300);
 	
 	/**
 	 * This performs the same function as {@link #regionBuilder}, but is used when
@@ -220,8 +231,38 @@ public class Settings implements Serializable {
 		return bufferBuilder;
 	}
 	
+	public int getWindowSize() {
+		return windowSize;
+	}
+	
+	public double getNSdsAboveMean() {
+		return nSdsAboveMean;
+	}
+	
 	public SpectrogramWriter getSpectrogramWriter() {
 		return new PgmSpectrogramConstellationWriter(constellationExtractor, progressNotifer);
+	}
+	
+	public StarBuffer.Builder getStarSelectionBuffer() {
+		return starSelectionBuffer;
+	}
+	
+	public Settings setNSdsAboveMean(double nSdsAboveMean) {
+		this.nSdsAboveMean = nSdsAboveMean;
+		if (peakDetector instanceof StatefulSdsFromMeanPeakDetector.Builder) {
+			return this.setPeakDetector(StatefulPeakDetector.sdsFromMean(windowSize, nSdsAboveMean));
+		}
+		return this;
+	}
+	
+	public Settings setWindowSize(int windowSize) {
+		this.windowSize = windowSize;
+		if (peakDetector instanceof StatefulSdsFromMeanPeakDetector.Builder) {
+			return this.setPeakDetector(StatefulPeakDetector.sdsFromMean(windowSize, nSdsAboveMean));
+		}
+		else {
+			return this.setPeakDetector(StatefulPeakDetector.meanDelta(windowSize));
+		}
 	}
 	
 	public Settings setProgressNotifer(ProgressNotifier.Builder progressNotifer) {

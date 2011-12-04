@@ -34,4 +34,22 @@ public class IOHelper {
 	public static String getRelativePath(File dir, File child) {
 		return dir.getAbsoluteFile().toURI().relativize(child.getAbsoluteFile().toURI()).getPath();
 	}
+	
+	public static File toSequenceFile(File file) {
+		return toSequenceFile(file.getAbsolutePath());
+	}
+	
+	public static File toSequenceFile(String file) {
+		File b = new File(file);
+		File r = new File(file);
+		String extension = b.getName().substring(b.getName().lastIndexOf('.')+1);
+		String base = b.getName().substring(0, b.getName().lastIndexOf('.'));
+		int i = 2;
+		
+		while (r.exists()) {
+			r = new File(b.getParentFile(), String.format("%s-%d.%s", base, i++, extension));
+		}
+		
+		return r;
+	}
 }

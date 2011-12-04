@@ -25,7 +25,7 @@ import com.google.common.collect.MinMaxPriorityQueue;
  */
 public class EvenlySpreadInTimeStarBuffer extends StarBuffer {
 	
-	protected static class Builder extends StarBuffer.Builder {
+	public static class Builder extends StarBuffer.Builder {
 		public Builder(double starDensityFactor) {
 			super(starDensityFactor);
 		}

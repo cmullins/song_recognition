@@ -1,7 +1,5 @@
 package org.sidoh.song_recognition.signature;
 
-import java.util.List;
-
 import org.apache.commons.math.distribution.NormalDistribution;
 import org.apache.commons.math.distribution.NormalDistributionImpl;
 import org.sidoh.math.Histogram;
@@ -15,8 +13,8 @@ public class EntropyScorer extends HistogramScorer {
 
 		NormalDistribution dist = new NormalDistributionImpl(hist.meanCount(), hist.sdCount());
 		
-		for (List<Double> bucket : hist.getValues().values()) {
-			double p = dist.density(Double.valueOf(bucket.size()));
+		for (int bucketSize : hist.getValues().values()) {
+			double p = dist.density(Double.valueOf(bucketSize));
 			
 			entropy += p*Math.log(p);
 		}
