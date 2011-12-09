@@ -1,0 +1,115 @@
+================================================================================
+================================================================================
+================================================================================
+LICENSE
+
+This software is released under the MIT license. See LICENSE for more
+information.
+
+================================================================================
+================================================================================
+================================================================================
+PREPARING SONG DATA
+
+If you are using UNIX, ./scripts/experiment_setup.sh will do almost all of the
+work for you. It makes use of several common utilties which must be installed
+first:
+    - sox: http://sox.sourceforge.net/
+    - mpg123: http://www.mpg123.de/
+
+After installing the prerequisite software, simply place any song files you want
+to test into the directory ./songs/mp3s and run the script. It will do the
+following with each song:
+    1. Convert to a standardized format: 44.1 KHz PCM wav, and named in a way
+       that includes only [a-z0-9_].
+    2. Random samples will be taken from each song, of 15, 20, and 25 seconds in
+       length. The results will be placed in ./songs/samples
+    3. Any noises in ./songs/noise will be interlaced with copies of each of the
+       samples. The results will be in ./songs/samples and have a name that ends
+       with -added-noise-(noise name).wav.
+    4. Then all of the samples in ./songs/samples will be "downconverted" by
+       converting them to a 3GP file and then re-converting them to 44.1 KHz
+       PCM wavs.
+
+================================================================================
+================================================================================
+================================================================================
+ABOUT
+
+Software is written in Java. The names of programs to follow indicate the name
+of the Java class file the program is contained in.
+
+There are several parts to this software. The end user can make use of a few
+utilities.
+
+*****************************************
+* TO USE THIS SOFTWARE, YOU SHOULD INSTALL APACHE ANT (if you're on OS X, Linux,
+* etc., you probably already have it):
+* 	http://ant.apache.org/
+*****************************************
+
+PROGRAMS AVAILABLE FOR USE, ALL RUNNABLE THROUGH ANT:
+
+1. spectrogram creation: 
+   "ant spectrogram -Dwav_file=path/to/wav/file.wav"
+
+   - Given a .wav file, create a spectrogram and save it as a PNG image. By 
+     default, the image is given the same name as the input file with a ".png"
+     extension added onto it.
+
+2. Settings twiddle server
+   "ant twiddle-server -Dwavs_dir=path/to/dir/with/wavs"
+   - Runs a HTTP server (on port 8000 by default) that allows the user to fiddle
+     with the various parameters used to generate signatures and observe how
+     they change the resulting spectrograms.
+   - A list of songs is available in the UI. This is a directory listing of
+     directory specified with the -Dwavs_dir= argument.
+   - After starting the twiddle server, open a browser and navigate to
+     http://localhost:8000.
+
+3. Signature database builder
+   "ant build-signature-db -Ddbfile=path/to/db -Dwavs_dir=path/to/wavs/dir"
+   - This creates a signature database given a list of WAV files. The provided
+     files should have a standardized sample rate (in the paper, 44.1 KHz is
+     used).
+   - The -Ddbfile= argument indicates the path that Apache Derby should put its
+     database files.
+   - The -Dwavs_dir= argument should be a directory containing wav files to add
+     to the db.
+   - If the resulting database is going to be used with BulkTest (described
+     below), each filename should match the regex ^[a-z0-9_]+$. If using
+     experiment_setup.sh, this is taken care of for you.
+
+4. Bulk clip tester
+   "ant bulk-test -Ddbfile=path/to/db \
+          -Dclips_dir=path/to/clips/dir \
+          -Dreport_dir=path/to/report/dir"
+   - This program was used for the figures and results in the report. 
+   - Scores each clip in -Dclips_dir= argument against the signature database
+     specified in the -Ddbfile argument.
+   - Report data is placed in the directory specified by -Dreport_dir=.
+   - Determines if the answer it provides is correcty by extracting information
+     from the filename. If using your own files, make every effort to use
+     ./scripts/experiment_setup.sh.
+   - !!! WARNING !!! this is a resource intensive program. It loads the
+     signature database into memory and runs everything in parallel. Don't plan
+     to do anything important on your machine while this is running.
+   - Runs an embedded HTTP server allowing you to track progress. This is
+     accessible via http://localhost:8000
+   - Generates spectrograms and histograms for each clip it gets the wrong
+     answer for. These are viewable through the HTTP interface.
+   - Writes raw results to a csv file in report directory (raw.txt).
+
+================================================================================
+================================================================================
+================================================================================
+TYPICAL WORKFLOW
+
+1. Generate song data. Put files in ./songs/mp3s and run
+   ./scripts/experiment_setup.sh.
+
+2. Generate signature database using "ant build-signature-db" with wavs dir 
+   being ./songs/wavs
+
+3. Test generated clips agains the signature db using ant bulk-test. The clips
+   directory should probably be ./songs/samples.

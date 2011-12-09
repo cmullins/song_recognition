@@ -236,8 +236,12 @@ public class BufferedCountingMap {
 			for (int i = 0; i < blockSize; i++) {
 				block[i] = 0;
 			}
-			leftChild.reset();
-			rightChild.reset();
+			if (leftChild != null) {
+				leftChild.reset();
+			}
+			if (rightChild != null) {
+				rightChild.reset();
+			}
 		}
 		
 		public int leftBoundary() {

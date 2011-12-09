@@ -1,0 +1,120 @@
+<project name="SongRecognition" default="dist" basedir=".">
+    <description>
+    </description>
+  <!-- set global properties for this build -->
+  <property name="src" location="src/java"/>
+  <property name="html" location="src/html"/>
+  <property name="build" location="bin/classes"/>
+  <property name="dist"  location="bin"/>
+  <property name="lib"  location="lib"/>
+  <path id="build-cp">
+    <pathelement path="${classpath}"/>
+    <pathelement path="${build}"/>
+    <fileset dir="${lib}">
+      <include name="**/*.jar"/>
+    </fileset>
+  </path>
+  <path id="run-cp">
+    <pathelement path="${classpath}"/>
+    <fileset dir="${lib}">
+      <include name="**/*.jar"/>
+    </fileset>
+    <fileset dir="${dist}/lib">
+      <include name="**/*.jar"/>
+    </fileset>
+  </path>
+
+  <target name="init">
+    <!-- Create the time stamp -->
+    <tstamp/>
+    <!-- Create the build directory structure used by compile -->
+    <mkdir dir="${build}"/>
+	<mkdir dir="${dist}"/>
+  </target>
+
+  <target name="compile" depends="init"
+        description="compile the source " >
+    <!-- Compile the java code from ${src} into ${build} -->
+    <javac srcdir="${src}" destdir="${build}">
+      <classpath refid="build-cp"/>
+    </javac>
+  </target>
+
+  <target name="dist" depends="compile"
+        description="generate the distribution" >
+    <!-- Create the distribution directory -->
+    <mkdir dir="${dist}/lib"/>
+
+    <jar jarfile="${dist}/lib/song-recognition.jar">
+      <fileset dir="${build}"/>
+      <fileset dir="${html}"/>
+    </jar>
+  </target>
+
+  <target name="clean"
+        description="clean up" >
+    <!-- Delete the ${build} and ${dist} directory trees -->
+    <delete dir="${build}"/>
+    <delete dir="${dist}"/>
+  </target>
+
+  <target name="build-signature-db" depends="dist">
+    <fail unless="dbfile">Specify dbfile with -Ddbfile=/path/to/db</fail>
+    <fail unless="wavs_dir">Specify path to wav file directory with -Dwavs_dir=/path/to/wavs/dir</fail>
+
+    <java 
+      classname="org.sidoh.song_recognition.database.BulkDbBuilder" 
+      fork="true"
+      maxmemory="2000m">
+
+      <classpath refid="run-cp"/>
+      <arg value="${dbfile}"/>
+      <arg value="${wavs_dir}"/>
+    </java>
+  </target>
+
+  <target name="twiddle-server" depends="dist">
+    <fail unless="wavs_dir">Specify directory with test wavs with -Dwavs_dir=/path/to/wavs/dir</fail>
+
+    <java classname="org.sidoh.song_recognition.benchmark.SettingsTwiddler" 
+      fork="true"
+      maxmemory="2000m">
+
+      <classpath refid="run-cp"/>
+      <arg line="-sd ${wavs_dir}"/>
+    </java>
+  </target>
+
+  <target name="spectrogram" depends="dist">
+    <fail unless="wav_file">Specify wav file with -Dwav_file=/path/to/wav/file</fail>
+
+    <java classname="org.sidoh.song_recognition.benchmark.CreateSpectrogram"
+      fork="true"
+      maxmemory="2000m">
+
+      <classpath refid="run-cp"/>
+      <arg line="${wav_file}"/>
+    </java>
+  </target>
+
+  <target name="bulk-test" depends="dist">
+    <fail unless="dbfile">Specify db file with -Ddbfile=/path/to/db/file</fail>
+    <fail unless="clips_dir">Specify directory containing clips to test with -Dclips_dir=/path/to/clips/dir</fail>
+    <fail unless="report_dir">Specify report directory with -Dreport_dir=/path/to/report/dir</fail>
+
+    <java classname="org.sidoh.song_recognition.benchmark.BulkTest"
+      fork="true"
+      maxmemory="2000m">
+
+      <classpath refid="run-cp"/>
+      <arg line="--database ${dbfile}"/>
+      <arg line="--wavs-dir ${clips_dir}"/>
+      <arg line="--report-path ${report_dir}"/>
+      <arg value="--in-memory"/>
+      <arg value="--enable-http"/>
+      <arg value="--force-overwrite"/>
+      <arg line="--report-verbosity 2"/>
+    </java>
+  </target>
+
+</project>

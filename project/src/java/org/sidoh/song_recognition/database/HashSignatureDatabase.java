@@ -8,23 +8,24 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 import org.sidoh.collections.DefaultingHashMap;
 import org.sidoh.collections.HashOfSets;
-import org.sidoh.collections.TreeMapOfSets;
 import org.sidoh.io.ProgressNotifier;
 import org.sidoh.io.ProgressNotifier.Builder;
+import org.sidoh.math.Histogram;
 import org.sidoh.song_recognition.benchmark.Settings;
+import org.sidoh.song_recognition.signature.HistogramScorer;
 import org.sidoh.song_recognition.signature.LoggingScorer;
-import org.sidoh.song_recognition.signature.ReconstructedStarHashSignature;
-import org.sidoh.song_recognition.signature.StarHashComparator;
 import org.sidoh.song_recognition.signature.StarHashSignature;
 
 public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> {
@@ -112,6 +113,7 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 
 		private HashOfSets<Integer, CacheEntry> cache;
 		private Map<Integer, String> songCache;
+		private ArrayList<Histogram> histograms;
 
 		private boolean inMemory = false;
 		
@@ -121,6 +123,7 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 			this.progress = progress;
 			this.cache = new HashOfSets<Integer, CacheEntry>();
 			this.songCache = new HashMap<Integer, String>();
+			this.histograms = new ArrayList<Histogram>();
 			
 			initDb();
 			
@@ -165,6 +168,10 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 			
 			while (songs.next()) {
 				songCache.put(songs.getInt("ID"), songs.getString("NAME"));
+			}
+			
+			for (int i = 0; i < songCache.keySet().size(); i++) {
+				histograms.add(new Histogram(10000));
 			}
 			
 			songs.close();
@@ -227,27 +234,22 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 			shutdown();
 		}
 		
-		public Map<Integer, ReconstructedStarHashSignature> getOffsetsByHashes(StarHashSignature sig) throws SQLException {
-			return getOffsetsByHashes(sig, false);
-		}
-		
-		public Map<Integer, ReconstructedStarHashSignature> getOffsetsByHashes(StarHashSignature sig, boolean quiet) throws SQLException {
-			ReconstructingMap songs = new ReconstructingMap();
-			
-			ProgressNotifier notifier = 
-				(quiet ? ProgressNotifier.nullNotifier()
-					  : progress
-					).create("Querying DB...", sig.getStarHashes().keySet().size());
-			
-			for (Integer hash : sig.getStarHashes().keySet()) {
-				songs.addHashes(hash, getMatchingHashes(hash));
-				
-				notifier.update();
+		public synchronized List<Histogram> constructOffsetHistograms(StarHashSignature sig) throws SQLException {
+			for (int songId : songCache.keySet()) {
+				histograms.get(songId-1).reset();
 			}
 			
-			notifier.complete();
+			for (Entry<Integer, Set<Integer>> entry : sig.getStarHashes().entrySet()) {
+				Iterable<CacheEntry> matches = getMatchingHashes(entry.getKey());
+				
+				for (CacheEntry dbMatch : matches) {
+					for (int offset : entry.getValue()) {
+						histograms.get(dbMatch.getSongId()-1).addValue(dbMatch.getTimeOffset() - offset);
+					}
+				}
+			}
 			
-			return songs;
+			return histograms;
 		}
 		
 		public SongMetaData getSongById(int id) throws SQLException {
@@ -266,7 +268,8 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 				name = results.getString("NAME");
 			}
 			else {
-				throw new RuntimeException("DB is closed and song with id `" + id + "' isn't cached!");
+				name = "UNKNOWN";
+				System.err.println("WARNING: DB is closed and song with id `" + id + "' isn't cached!");
 			}
 			
 			return new SongMetaData(name, name, id);
@@ -316,37 +319,6 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 				return items.iterator();
 			}
 		}
-		
-		protected static class ReconstructingMap extends DefaultingHashMap<Integer, ReconstructedStarHashSignature> {
-			private static final long serialVersionUID = 8218976556676720258L;
-
-			@Override
-			protected ReconstructedStarHashSignature getDefaultValue() {
-				return new ReconstructedStarHashSignature(new HashOfSets<Integer, Integer>());
-			}
-			
-			@Override
-			public ReconstructedStarHashSignature get(Object key) {
-				ReconstructedStarHashSignature value = super.get(key);
-				
-				if (value.getId() == 0) {
-					value.setId((Integer)key);
-				}
-				
-				return value;
-			}
-			
-			protected void addHashes(int hash, Iterable<CacheEntry> vals) {
-				for (CacheEntry val : vals) {
-					addHash(val.getSongId(), hash, val.getTimeOffset());
-				}
-			}
-			
-			protected void addHash(int song, int hash, int offset) {
-				((HashOfSets<Integer, Integer>)this.get(song).getStarHashes()).addFor(hash, offset);
-			}
-			
-		}
 	}
 	
 	private final Connection db;
@@ -385,20 +357,30 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 	}
 
 	@Override
-	public QueryResponse<StarHashSignature> findSong(StarHashSignature signature) {
+	public synchronized QueryResponse<StarHashSignature> findSong(StarHashSignature signature) {
 		try {
-			Map<Integer, ReconstructedStarHashSignature> offsetsByHashes = dbHelper.getOffsetsByHashes(signature);
-			QueryResponse<StarHashSignature> response = getResponse(
-					settings.getProgressNotifer(),
-					settings.getStarHashComparator(), 
-					offsetsByHashes.values(), 
-					signature);
-			ReconstructedStarHashSignature sig = (ReconstructedStarHashSignature) response.signature();
+			List<Histogram> histograms = dbHelper.constructOffsetHistograms(signature);
+			HistogramScorer scorer = settings.getHistogramScorer();
 			
-			if (sig != null) {
-				response.setSong(dbHelper.getSongById(sig.getId()));
+			int bestId = -1;
+			double bestScore = Double.NEGATIVE_INFINITY;
+			
+			for (int i = 0; i < histograms.size(); i++) {
+				double score = scorer.score(histograms.get(i));
+				
+				if (score > bestScore) {
+					bestScore = score;
+					bestId = i;
+				}
 			}
-			return response;
+			
+			if (bestId == -1) {
+				return null;
+			}
+			
+			return new QueryResponse<StarHashSignature>(bestScore,
+				dbHelper.getSongById(bestId+1),
+				signature);
 		}
 		catch (SQLException e) {
 			throw new RuntimeException(e);
@@ -421,32 +403,40 @@ public class HashSignatureDatabase extends SignatureDatabase<StarHashSignature> 
 	 * @return
 	 * @throws SQLException
 	 */
-	public QueryResponse<StarHashSignature> findSongWithDebugInfo(StarHashSignature signature,
+	public synchronized QueryResponse<StarHashSignature> findSongWithDebugInfo(
+		StarHashSignature signature,
 		File histogramOutputDir,
 		boolean quiet) throws SQLException {
-		
-		Map<Integer, ReconstructedStarHashSignature> offsetsByHashes = dbHelper.getOffsetsByHashes(signature, quiet);
-		
-		// Choose the best.
-		double bestScore = Double.NEGATIVE_INFINITY;
-		ReconstructedStarHashSignature best = null;
-		
-		for (ReconstructedStarHashSignature sig : offsetsByHashes.values()) {
-			String histogramFile = new File(histogramOutputDir, dbHelper.getSongById(sig.getId()).getName()).getAbsolutePath();
-			StarHashComparator tmpComparator = settings.getStarHashComparator().copy().setHistogramScorer(
-				new LoggingScorer(histogramFile, settings.getHistogramScorer()));
+
+		try {
+			List<Histogram> histograms = dbHelper.constructOffsetHistograms(signature);
 			
-			double score = tmpComparator.similarity(sig, signature);
-			
-			if (score > bestScore) {
-				bestScore = score;
-				best = sig;
+			int bestId = -1;
+			double bestScore = Double.NEGATIVE_INFINITY;
+
+			for (int i = 0; i < histograms.size(); i++) {
+				String histogramFile = new File(histogramOutputDir, 
+					dbHelper.getSongById(i+1).getName()).getAbsolutePath();
+				HistogramScorer scorer = new LoggingScorer(histogramFile, settings.getHistogramScorer());
+				
+				double score = scorer.score(histograms.get(i));
+				
+				if (score > bestScore) {
+					bestScore = score;
+					bestId = i;
+				}
 			}
+			
+			if (bestId == -1) {
+				return null;
+			}
+			
+			return new QueryResponse<StarHashSignature>(bestScore,
+				dbHelper.getSongById(bestId),
+				signature);
 		}
-		
-		return new QueryResponse<StarHashSignature>(
-			bestScore,
-			dbHelper.getSongById(best.getId()),
-			best);
+		catch (SQLException e) {
+			throw new RuntimeException(e);
+		}
 	}
 }

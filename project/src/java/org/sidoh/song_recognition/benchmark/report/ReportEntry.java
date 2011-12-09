@@ -88,14 +88,13 @@ public class ReportEntry implements Serializable {
 	private static final long serialVersionUID = 6147611654719791675L;
 	
 	protected SongMetaData song;
-	protected QueryResponse<StarHashSignature> response;
 	
 	private static final Pattern clipFilePart 
 		= Pattern.compile("^([a-z0-9_]+)-([0-9]+)-to-([0-9]+)(-added-noise-([a-z0-9_]+))?.wav$");
 	private static final Pattern fullFilePart 
 		= Pattern.compile("/?([^./]*).wav");
 	private static final Pattern histogramName
-		= Pattern.compile("^([a-z0-9_]+\\.wav)_([01]\\.[0-9]+)\\.txt\\.png$");
+		= Pattern.compile("^([a-z0-9_]+\\.wav)_([01]\\.[0-9]+)\\.txt(\\.png)?$");
 	
 	public static final String NO_NOISE = "NONE";
 	
@@ -107,10 +106,14 @@ public class ReportEntry implements Serializable {
 
 	private Map<String, Pair<Double,String>> histograms;
 	private String spectrogramPath;
+
+	private SongMetaData responseSong;
+	private double confidence;
 	
 	public ReportEntry(SongMetaData song, QueryResponse<StarHashSignature> response) {
 		this.song = song;
-		this.response = response;
+		this.responseSong = response.song();
+		this.confidence = response.confidence();
 		
 		Matcher clipMatcher = getClipMatcher();
 		
@@ -139,18 +142,14 @@ public class ReportEntry implements Serializable {
 	public SongMetaData getClipMetaData() {
 		return song;
 	}
-
-	public QueryResponse<StarHashSignature> getResponse() {
-		return response;
-	}
 	
 	public double getConfidence() {
-		return response.confidence();
+		return confidence;
 	}
 	
 	public String getSongId() {
-		if (response.song() != null) {
-			return new File(response.song().getFilename()).getName();
+		if (responseSong != null) {
+			return new File(responseSong.getFilename()).getName();
 		}
 		else {
 			return null;
@@ -216,7 +215,7 @@ public class ReportEntry implements Serializable {
 			String songId = m.group(1);
 			double score  = Double.parseDouble(m.group(2));
 			
-			histograms.put(songId, Pair.create(score, file));
+			histograms.put(songId, Pair.create(score, String.format("%s.png", file)));
 		}
 		
 		return this;
@@ -246,7 +245,7 @@ public class ReportEntry implements Serializable {
 	private Matcher getHistMatcher(String name) {
 		Matcher m = histogramName.matcher(new File(name).getName());
 		if (!m.matches()) {
-			throw new RuntimeException("Invalid histogram name: " + name);
+			throw new RuntimeException("Invalid histogram name: " + new File(name).getName());
 		}
 		return m;
 	}

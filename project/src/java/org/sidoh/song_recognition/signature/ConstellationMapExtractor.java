@@ -223,7 +223,7 @@ public class ConstellationMapExtractor implements SpectrogramSignatureExtractor<
 		}
 		
 		private class WorkerThread implements Runnable {
-			private List<StatefulPeakDetector> detectors;
+			private final List<StatefulPeakDetector> detectors;
 			private final int minFreq;
 			private final int maxFreq;
 			private int lastIndex;

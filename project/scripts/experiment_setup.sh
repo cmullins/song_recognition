@@ -14,17 +14,17 @@ WAVS_DIR=$DIR/../songs/wavs
 SAMPLES_DIR=$DIR/../songs/samples
 NOISE_DIR=$DIR/../songs/noise
 
+if [ ! -e "$SAMPLES_DIR" ]; then
+	echo "Samples directory doesn't exist: $SAMPLES_DIR! Creating it..."
+	mkdir -p "$SAMPLES_DIR"
+fi
+
 ##### Experiment settings
 
 # Which script to use to downconvert samples (not training files)
 #DOWNCONVERT_SCRIPT=echo
+TRIM_SCRIPT=$DIR/random_interval_trim.sh
 DOWNCONVERT_SCRIPT=$DIR/gsm_downconvert.sh
-
-# Start locations to use for samples
-START_LOCATIONS=$(seq 12 17 120)
-
-# Lengths of samples
-SAMPLE_LENGTHS="15 20 30"
 
 ###### BEGIN PROCESSING
 
@@ -40,24 +40,7 @@ done
 
 cd $WAVS_DIR
 for wav in $(ls *.wav); do
-	song_len=$(sox $wav -n stat 2>&1 | grep Length | awk '{printf("%d", $NF)}')
-
-	for start_location in $START_LOCATIONS; do
-		for length in $SAMPLE_LENGTHS; do
-			end_location=$(($start_location + $length))
-
-			# If the end location goes past the length of the song, then forget about
-			# this sample. It'll screw up stats.
-			if [ $end_location -le $song_len ]; then
-				sample_name=$SAMPLES_DIR/$(basename "$wav" .wav)-$start_location-to-$end_location.wav
-
-				if [ ! -f "$sample_name" ]; then
-					echo "Trimming: $sample_name"
-					sox $wav $sample_name trim $start_location $length
-				fi
-			fi
-		done
-	done
+	$TRIM_SCRIPT "$wav" "$SAMPLES_DIR"
 done
 
 cd $SAMPLES_DIR
@@ -86,5 +69,6 @@ for sample in $(ls *.wav | grep "[0-9][0-9]*.wav"); do
 	done
 done
 
+cd "$SAMPLES_DIR"
 find . -name "*.wav" -print0 | xargs -0 -n 1 -P ${MAX_PARALLEL_PROCESSES} -I {} \
 	bash -c "${DOWNCONVERT_SCRIPT} {}"

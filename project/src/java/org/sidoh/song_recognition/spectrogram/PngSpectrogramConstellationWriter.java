@@ -18,8 +18,8 @@ import org.sidoh.song_recognition.signature.ConstellationMapExtractor;
 import org.sidoh.song_recognition.signature.ConstellationMapSignature;
 
 public class PngSpectrogramConstellationWriter implements SpectrogramWriter {
-	private static final int DEFAULT_STAR_WIDTH = 2;
-	private static final int DEFAULT_STAR_HEIGHT = 2;
+	private static final int DEFAULT_STAR_WIDTH = 4;
+	private static final int DEFAULT_STAR_HEIGHT = 4;
 	
 	private static final int[] STAR_COLOR = {0xFF, 0, 0};
 	private static final int[] SECOND_BARRIER_COLOR = {0, 0xFF, 0};
@@ -29,22 +29,32 @@ public class PngSpectrogramConstellationWriter implements SpectrogramWriter {
 	private final int width;
 	private final int height;
 	private final Builder progress;
+	private final boolean invert;
 	
 	public PngSpectrogramConstellationWriter(ConstellationMapExtractor extractor, ProgressNotifier.Builder progress) {
-		this(extractor, progress, DEFAULT_STAR_WIDTH, DEFAULT_STAR_HEIGHT);
+		this(extractor, progress, false);
+	}
+	
+	public PngSpectrogramConstellationWriter(ConstellationMapExtractor extractor, ProgressNotifier.Builder progress, boolean invert) {
+		this(extractor, progress, DEFAULT_STAR_WIDTH, DEFAULT_STAR_HEIGHT, invert);
 	}
 	
 	public PngSpectrogramConstellationWriter(ConstellationMapExtractor extractor,
 			ProgressNotifier.Builder progress,
-			int width, int height) {
+			int width, int height, boolean invert) {
 		this.extractor = extractor;
 		this.progress = progress;
 		this.width = width;
 		this.height = height;
+		this.invert = invert;
 	}
 
 	protected int valToColor(double value) {
-		return (int)Math.max(0, Math.min(value, 255));
+		int val = (int)Math.max(0, Math.min(value, 255));
+		if (invert) {
+			val = 255 - val;
+		}
+		return val;
 	}
 
 	@Override

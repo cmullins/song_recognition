@@ -40,8 +40,11 @@ import org.apache.commons.io.output.ByteArrayOutputStream;
 import org.sidoh.collections.HashOfSets;
 import org.sidoh.io.IOHelper;
 import org.sidoh.io.ProgressNotifier;
+import org.sidoh.peak_detection.StatefulExponentialSmoothingFunction;
 import org.sidoh.peak_detection.StatefulPeakDetector;
 import org.sidoh.peak_detection.StatefulSdsFromMeanPeakDetector;
+import org.sidoh.peak_detection.StatefulSmoothedPeakDetector;
+import org.sidoh.peak_detection.StatefulSmoothingFunction;
 import org.sidoh.song_recognition.audio_io.FrameBuffer;
 import org.sidoh.song_recognition.audio_io.WavFileException;
 import org.sidoh.song_recognition.signature.CoordinateAgnosticStarBuffer;
@@ -144,13 +147,7 @@ public class SettingsTwiddler {
 			return (Map<String, Object>) ex.getAttribute("parameters");
 		}
 	}
-	public static class StaticOptions {
-		public final static String htmlDir = "/Users/chris/src/663_pattern_recognition/project/src/html/twiddle_server";
-		
-		public static InputStream getFileStream(String name) throws FileNotFoundException {
-			return new FileInputStream(new File(htmlDir, name));
-		}
-	}
+	
 	public static class ClOptions {
 		protected static CommandLine cmd;
 		
@@ -162,7 +159,7 @@ public class SettingsTwiddler {
 					.withDescription("Port to run HTTP server on. Default = 8000")
 					.withArgName("p")
 					.withLongOpt("http-port")
-					.create("httpport")),
+					.create("p")),
 			@SuppressWarnings("static-access")
 			WORK_DIR(
 				OptionBuilder
@@ -170,7 +167,7 @@ public class SettingsTwiddler {
 					.withDescription("Tmp working directory. Default = sys tmp dir")
 					.withArgName("wd")
 					.withLongOpt("work-dir")
-					.create("workdir")),
+					.create("wd")),
 			@SuppressWarnings("static-access")
 			SONGS_DIR(
 				OptionBuilder
@@ -179,7 +176,7 @@ public class SettingsTwiddler {
 					.withArgName("sd")
 					.withLongOpt("songs-dir")
 					.isRequired()
-					.create("songsdir")),
+					.create("sd")),
 			@SuppressWarnings("static-access")
 			MAX_THREADS(
 				OptionBuilder
@@ -187,7 +184,7 @@ public class SettingsTwiddler {
 					.withDescription("Maximum number of worker threads to use (default = # processors)")
 					.withArgName("t")
 					.withLongOpt("max-num-threads")
-					.create("maxthreads"));
+					.create("t"));
 			
 			private final Option option;
 			private ClOption(Option option) {
@@ -320,7 +317,6 @@ public class SettingsTwiddler {
 				@Override
 				public void run() {
 					try {
-						System.out.println(mainThread.getName());
 						mainThread.join();
 					}
 					catch (InterruptedException e) { }
@@ -528,12 +524,65 @@ public class SettingsTwiddler {
 						settings.getStarDensityFactor()));
 				}
 			}
+			else if (key.equals("smoothing-fn")) {
+				if (val.equals("exponential")) {
+					settings.setSmoothingFunction(
+						StatefulSmoothingFunction.exponentialSmoother(settings.getExponentialSmoothingFactor()));
+				}
+				else {
+					settings.setSmoothingFunction(null);
+				}
+			}
+			else if (key.equals("exp-smoothing-alpha")) {
+				settings.setExponentialSmoothingFactor(Double.parseDouble(val));
+			}
 			else {
 				System.err.println("Invalid setting key: " + key);
 				return;
 			}
 			
 			updateImages();
+		}
+		
+		protected static String getPeakDetectionAlgorithmId(StatefulPeakDetector.Builder builder) {
+			if (builder instanceof StatefulSmoothedPeakDetector.Builder) {
+				return getPeakDetectionAlgorithmId(((StatefulSmoothedPeakDetector.Builder)builder).innerBuilder());
+			}
+			else if (builder instanceof StatefulSdsFromMeanPeakDetector.Builder) {
+				return "n-sds";
+			}
+			else {
+				return "max";
+			}
+		}
+		
+		protected static String serializeSmoothingFunction(StatefulPeakDetector.Builder builder) {
+			if (builder instanceof StatefulSmoothedPeakDetector.Builder) {
+				return serializeSmoothingFunction(
+					((StatefulSmoothedPeakDetector.Builder)builder).smoothingFunction());
+			}
+			else {
+				return String.format("{\"algorithm\" : \"NONE\"}");
+			}
+		}
+		
+		protected static String serializeSmoothingFunction(StatefulSmoothingFunction.Builder builder) {
+			String algorithm = null;
+			String params = null;
+			
+			if (builder instanceof StatefulExponentialSmoothingFunction.Builder) {
+				algorithm = "exponential";
+				double smoothingFactor = ((StatefulExponentialSmoothingFunction.Builder)builder).getSmoothingFactor();
+				
+				params = String.format("{\"smoothingFactor\" : %f}", smoothingFactor);
+			}
+			
+			if (algorithm != null) {
+				return String.format("{\"algorithm\" : \"%s\", \"params\" : %s}", algorithm, params);
+			}
+			else {
+				return String.format("{\"algorithm\" : \"NONE\"}");
+			}
 		}
 		
 		public String settingsToJSON() {
@@ -552,10 +601,8 @@ public class SettingsTwiddler {
 			
 			b.append(String.format("\"frame-size\" : %d,", settings.getFrameSize()));
 			b.append(String.format("\"frame-overlap\" : %.2f,", settings.getFrameOverlap()));
-			b.append(String.format("\"peak-algorithm\" : \"%s\",",
-				settings.getPeakDetector() instanceof StatefulSdsFromMeanPeakDetector.Builder
-					? "n-sds"
-					: "max"));
+			b.append(String.format("\"peak-algorithm\" : \"%s\",", getPeakDetectionAlgorithmId(settings.getPeakDetector())));
+			b.append(String.format("\"smoothing-fn\" : %s,", serializeSmoothingFunction(settings.getPeakDetector())));
 			b.append(String.format("\"window-size\" : %d,", settings.getWindowSize()));
 			b.append(String.format("\"n-sds\" : %f,", settings.getNSdsAboveMean()));
 			b.append(String.format("\"peak-density\" : %.2f,", settings.getStarDensityFactor()));
@@ -570,15 +617,19 @@ public class SettingsTwiddler {
 			serveStream(new ByteArrayInputStream(s.getBytes()), ex);
 		}
 		
+		protected InputStream getStaticFileStream(String filename) throws IOException {
+			return getClass().getClassLoader().getResourceAsStream(new File("twiddle_server", filename).getPath());
+		}
+		
 		protected class TwiddleRequestHandler implements HttpHandler {
 			@Override
 			public void handle(HttpExchange ex) throws IOException {
 				String uri = ex.getRequestURI().getPath();
 				
 				if (uri.equals("/")) {
-					serveStream(StaticOptions.getFileStream("ui.html"), ex);
+					serveStream(getStaticFileStream("ui.html"), ex);
 				}
-				else if (uri.startsWith("/settings")) {
+				else if (uri.startsWith("/settings") && !uri.endsWith(".js")) {
 					String settingId = uri.substring(Math.min(uri.length(), "/settings/".length()));
 					
 					if (settingId.length() > 0) {
@@ -608,7 +659,7 @@ public class SettingsTwiddler {
 				}
 				else {
 					try {
-						InputStream toServe = StaticOptions.getFileStream(uri);
+						InputStream toServe = getStaticFileStream(uri);
 						serveStream(toServe, ex);
 					}
 					catch (FileNotFoundException e) {

@@ -2,12 +2,12 @@ package org.sidoh.peak_detection;
 
 public class StatefulSdsFromMeanPeakDetector extends StatefulPeakDetector {
 	
-	protected static class SdsFromMeanBuilder extends StatefulPeakDetector.Builder {
+	public static class Builder extends StatefulPeakDetector.Builder {
 		
 		private final int windowWidth;
 		private final double numSds;
 
-		public SdsFromMeanBuilder(int windowWidth, double numSds) {
+		public Builder(int windowWidth, double numSds) {
 			this.windowWidth = windowWidth;
 			this.numSds = numSds;
 		}
@@ -59,6 +59,11 @@ public class StatefulSdsFromMeanPeakDetector extends StatefulPeakDetector {
 			
 			if (Math.abs(xi - mean) > (numSds*sd)) {
 				super.offerPeak(i, xi);
+				System.out.println(String.format("%d %d %f 1", count, index, value));
+			}
+			else {
+
+				System.out.println(String.format("%d %d %f 0", count, index, value));
 			}
 			
 			leftValues.pushValue(xi);

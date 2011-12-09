@@ -18,15 +18,7 @@ import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 
 public class ReportServer {
-	private static final class Settings {
-		public static final String jqueryInclude = 
-			"<script type=\"text/javascript\" src=\"http://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js\"></script>";
-		public static final String jqueryUiInclude =
-			"<script type=\"text/javascript\" src=\"https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/jquery-ui.min.js\"></script>";
-		
-		// TODO: I'm a terrible person.
-		public static final File staticFilePath = new File("/Users/chris/src/663_pattern_recognition/project/src/html/report_server");
-	}
+	private final ClassLoader classLoader = getClass().getClassLoader();
 	
 	private final Report report;
 	private final int port;
@@ -71,7 +63,7 @@ public class ReportServer {
 			String uri = ex.getRequestURI().getPath();
 			
 			if (uri.equals("/")) {
-				serveFile(new File(Settings.staticFilePath, "ui.html"), ex);
+				serveResource("ui.html", ex);
 			}
 			else if (uri.startsWith("/static/")) {
 				File realFile = new File(reportDir, uri.substring("/static/".length()));
@@ -88,14 +80,34 @@ public class ReportServer {
 				out.close();
 			}
 			else {
-				File fileToServe = new File(Settings.staticFilePath, ex.getRequestURI().getPath());
-				
-				serveFile(fileToServe, ex);
+				String resource = ex.getRequestURI().getPath();
+				serveResource(resource, ex);
+			}
+		}
+		
+		private void serveResource(String relpath, HttpExchange ex) throws IOException {
+			try {
+				InputStream stream = classLoader.getResourceAsStream(new File("report_server", relpath).getPath());
+				ByteArrayOutputStream bufferedStream = new ByteArrayOutputStream();
+				IOUtils.copy(stream, bufferedStream);
+				ex.sendResponseHeaders(200, bufferedStream.toByteArray().length);
+				OutputStream out = ex.getResponseBody();
+				IOUtils.copy(new ByteArrayInputStream(bufferedStream.toByteArray()), out);
+				out.close();
+			}
+			catch (FileNotFoundException e) {
+				ex.sendResponseHeaders(404, 0);
+				ex.getResponseBody().close();
+			}
+			catch (IOException e) {
+				ex.sendResponseHeaders(500, 0);
+				ex.getResponseBody().close();
 			}
 		}
 		
 		private void serveFile(File file, HttpExchange ex) throws IOException {
 			try {
+				
 				InputStream fileOut = new FileInputStream(file);
 				ex.sendResponseHeaders(200, FileUtils.sizeOf(file));
 				

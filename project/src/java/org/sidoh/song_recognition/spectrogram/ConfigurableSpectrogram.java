@@ -43,6 +43,7 @@ public class ConfigurableSpectrogram extends Spectrogram {
 	private double brightness = 0.0;
 	private double contrast   = 1.0;
 	private Scale scale       = Scale.LINEAR;
+	private boolean invert    = false;
 	
 	public ConfigurableSpectrogram(Spectrogram inner) {
 		this.inner = inner;
@@ -77,14 +78,22 @@ public class ConfigurableSpectrogram extends Spectrogram {
 	public double getIntensity(int time, int bin) {
 		double innerValue = scale.transform(inner.getIntensity(time, bin));
 		
-		return (brightness + (contrast * innerValue));
+		return getIntensity(innerValue);
 	}
 
 	@Override
 	public double getIntensity(int time, double frequency) {
 		double innerValue = scale.transform(inner.getIntensity(time, frequency));
 		
-		return (brightness + (contrast * innerValue));
+		return getIntensity(innerValue);
+	}
+	
+	protected double getIntensity(double raw) {
+		raw = (brightness + (contrast * raw));
+		if (invert) {
+			raw = 1.0d - raw;
+		}
+		return raw;
 	}
 	
 	@Override
@@ -130,6 +139,20 @@ public class ConfigurableSpectrogram extends Spectrogram {
 
 	public ConfigurableSpectrogram setScale(Scale scale) {
 		this.scale = scale;
+		return this;
+	}
+	
+	public boolean isInverted() {
+		return invert; 
+	}
+	
+	public ConfigurableSpectrogram setInverted(boolean invert) {
+		this.invert = invert;
+		return this;
+	}
+	
+	public ConfigurableSpectrogram invert() {
+		this.invert = true;
 		return this;
 	}
 

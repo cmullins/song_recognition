@@ -1,9 +1,11 @@
 package org.sidoh.song_recognition.benchmark;
 
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.sql.SQLException;
@@ -31,14 +33,14 @@ import org.sidoh.song_recognition.audio_io.WavFileException;
 import org.sidoh.song_recognition.benchmark.report.Report;
 import org.sidoh.song_recognition.benchmark.report.ReportEntry;
 import org.sidoh.song_recognition.benchmark.report.ReportServer;
-import org.sidoh.song_recognition.database.RdbmsHelper;
 import org.sidoh.song_recognition.database.HashSignatureDatabase;
+import org.sidoh.song_recognition.database.RdbmsHelper;
 import org.sidoh.song_recognition.database.SignatureDatabase.QueryResponse;
 import org.sidoh.song_recognition.database.SongMetaData;
 import org.sidoh.song_recognition.signature.StarHashExtractor;
 import org.sidoh.song_recognition.signature.StarHashSignature;
 import org.sidoh.song_recognition.spectrogram.ConfigurableSpectrogram;
-import org.sidoh.song_recognition.spectrogram.PgmSpectrogramConstellationWriter;
+import org.sidoh.song_recognition.spectrogram.PngSpectrogramConstellationWriter;
 import org.sidoh.song_recognition.spectrogram.Spectrogram;
 import org.sidoh.song_recognition.spectrogram.SpectrogramWriter;
 
@@ -204,7 +206,7 @@ public class BulkTest {
 	
 	@SuppressWarnings("static-access") // what a crappy builder. apache-cli disappoints.
 	public static enum ClOptions {
-		DATABASE(new Option("d", "database", true, "H2 database file")),
+		DATABASE(new Option("d", "database", true, "Derby database file")),
 		WAVS_DIR(new Option("vd", "wavs-dir", true, "Path to directory containing WAV test files (use instead of -vf)")),
 		WAV_FILES(OptionBuilder.hasArg()
 			.withArgName("vf")
@@ -273,7 +275,7 @@ public class BulkTest {
 	}
 	
 	public static void main(String[] args) throws IOException, ParseException, SQLException, WavFileException {
-		TestOptions options;
+		final TestOptions options;
 		try {
 			options = TestOptions.getOptions(args);
 		}
@@ -286,19 +288,26 @@ public class BulkTest {
 			return;
 		}
 		
-		Settings settings = Settings.defaults()
-			.setSpectrogramBuilder(Spectrogram.singletonStorage()) // Limit memory use
-		;
+		Settings settings = Settings.defaults();
 		
 		// Create new report and set up the directory it's allowed to put its stuff in.
 		// Start HTTP server if it's enabled.
-		Report report = new Report();
+		final Report report = new Report();
 		ReportServer httpServer = null;
 		if (options.httpEnabled()) {
 			if (options.verboseProgress()) {
 				System.out.println("Starting HTTP server on port " + options.httpPort());
 			}
 			httpServer = new ReportServer(report, options.getReportPath(), options.httpPort());
+			
+			// Force a report update on shutdown
+			Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+				@Override
+				public void run() {
+					System.out.println("Persisting report data...");
+					updateReport(report, options, true);
+				}
+			}));
 		}
 		
 		// Disable verbose updates if the verbose flag wasn't set.
@@ -329,13 +338,11 @@ public class BulkTest {
 		
 		// Create a progress notifier for us to use to keep user updated on how many files have
 		// been processed.
-		ProgressNotifier fileProgress = ProgressNotifier.consoleNotifier(100).create(
-			"Scoring clips...",
-			options.getWavFiles().length);
+		ProgressNotifier fileProgress = ProgressNotifier.nullNotifier().create(null,0);
 		
 		for (File clip : options.getWavFiles()) {
 			handleSingleClip(clip, options, settings, db, report);
-			updateReport(report, options);
+			updateReport(report, options, false);
 			
 			fileProgress.update();
 		}
@@ -346,46 +353,72 @@ public class BulkTest {
 			System.out.println("Shutting down worker threads");
 			verboseWorkers.shutdown();
 		}
+		
+		// Free some memory
+		db = null;
+		System.gc();
+		
+		// If HTTP is enabled, the application will stay open so that it can keep
+		// serving the UI. We should probably tell the user about this, though...
+		if (options.httpEnabled()) {
+			System.out.println("Everything is finished. Keeping the HTTP server running. "
+				+ "Type \"QUIT\" (Or press Ctrl-C) to quit the application.");
+
+			BufferedReader inReader = new BufferedReader(new InputStreamReader(System.in));
+			while (! inReader.readLine().toLowerCase().equals("quit"));
+			
+			// Close HTTP server. This should cause the application to exit.
+			httpServer.stop();
+		}
 	}
 	
 	private static final Semaphore reportUpdateLock = new Semaphore(1);
-	private static void updateReport(final Report report, final TestOptions options) {
+	private static void updateReport(final Report report, final TestOptions options, final boolean forceUpdate) {
 		
-		// Don't update if HTTP is enabled. No need.
-		if (options.httpEnabled()) {
-			return;
+		// If we're being forced to update, wait for a permit before continuing. Don't have
+		// to worry about a race condition here because there's only ever one thread wanting
+		// to update the files.
+		if (forceUpdate) {
+			try {
+				reportUpdateLock.acquire();
+			}
+			catch (InterruptedException e) { }
+			finally {
+				reportUpdateLock.release();
+			}
 		}
 		
-		if (reportUpdateLock.tryAcquire()) {
+		if (forceUpdate || reportUpdateLock.tryAcquire()) {
 			final File jsonFile = new File(options.getReportPath(), "report_data.json");
 			final File txtFile = new File(options.getReportPath(), "raw.txt");
 			
-			new Thread(new Runnable() {
+			Runnable task = new Runnable() {
 				@Override
 				public void run() {
 					try {
-						File tmpJson = File.createTempFile("report_data.json", "tmp");
+						// Don't update JSON if HTTP is enabled. It'd be kinda pointless.
+						if (! options.httpEnabled() || forceUpdate) {
+							File tmpJson = File.createTempFile("report_data.json", "tmp");
+							OutputStream jsonOut = new FileOutputStream(tmpJson);
+							Report.jsonSerializer.serialize(report, jsonOut);
+							jsonOut.close();
+							File tmpJson2 = new File(jsonFile.getParentFile(), "report_data.json.tmp");
+							FileUtils.copyFile(tmpJson, tmpJson2);
+							jsonFile.delete();
+							FileUtils.moveFile(tmpJson2, jsonFile);
+						}
+						
 						File tmpTxt  = File.createTempFile("raw.txt", "txt");
-						
-						OutputStream jsonOut = new FileOutputStream(tmpJson);
 						OutputStream txtOut = new FileOutputStream(tmpTxt);
-		
-						Report.jsonSerializer.serialize(report, jsonOut);
 						Report.txtSerializer.serialize(report, txtOut);
-						
-						jsonOut.close();
 						txtOut.close();
 
 						// Move the temporary files to the report directory before renaming them.
-						File tmpJson2 = new File(jsonFile.getParentFile(), "report_data.json.tmp");
 						File tmpTxt2  = new File(txtFile.getParentFile(), "raw.txt.tmp");
-						FileUtils.copyFile(tmpJson, tmpJson2);
 						FileUtils.copyFile(tmpTxt, tmpTxt2);
 						
 						// Rename 'em.
-						jsonFile.delete();
 						txtFile.delete();
-						FileUtils.moveFile(tmpJson2, jsonFile);
 						FileUtils.moveFile(tmpTxt2, txtFile);
 					}
 					catch (IOException e) {
@@ -395,7 +428,14 @@ public class BulkTest {
 						reportUpdateLock.release();
 					}
 				}
-			}).start();
+			};
+			
+			if (forceUpdate) {
+				task.run();
+			}
+			else {
+				new Thread(task).start();
+			}
 		}
 	}
 
@@ -435,9 +475,22 @@ public class BulkTest {
 	// Keep a copy of this around so we don't have to create it a bunch of times.
 	private static SpectrogramWriter spectrogramWriter = null;
 	
-	// This R script will get run on a histogram file outted by LoggingScorer. Should be called
+	// This R script will get run on a histogram file output by LoggingScorer. Should be called
 	// with String.format to fill in the parameters.
-	private static final String rScript = "png(filename=\"%s\",width=1500,height=400);d<-read.table(\"%s\");barplot(d[,2]);dev.off();";
+	private static final String rScript 
+		= "png(filename=\"%s.png\",width=1500,height=400);"
+			+ "d<-read.table(\"%s\");"
+			+ "barplot(d[,2]);"
+			+ "dev.off();";
+	
+	// You can use this script to generate postscript plots instead of PNGs.
+	//	private static final String rScript 
+	//		= "postscript(file=\"%s.eps\",width=15,height=4,horizontal=FALSE,paper=\"special\");"
+	//			+ "d<-read.table(\"%s\");"
+	//			+ "r<-NULL;"
+	//			+ "for (i in 1:nrow(d)) { for (j in 1:d[i,2]) { r <- rbind(r, d[i,1]); }};"
+	//			+ "hist(r,breaks=sort(unique(r)), xlab=\"Time delta\");"
+	//			+ "dev.off();";
 	
 	private static void outputVerboseInfo(
 			final ReportEntry entry, 
@@ -447,7 +500,7 @@ public class BulkTest {
 			final Settings settings) {
 		
 		if (spectrogramWriter == null) {
-			spectrogramWriter = new PgmSpectrogramConstellationWriter(
+			spectrogramWriter = new PngSpectrogramConstellationWriter(
 					settings.getConstellationExtractor().quiet(),
 					ProgressNotifier.nullNotifier());
 		}
@@ -475,25 +528,10 @@ public class BulkTest {
 					outputDir.mkdir();
 					
 					// Write PGM spectrogram, convert it to PNG.
-					String pgmFile = new File(outputDir, String.format("%s.pgm", new File(clip.getFilename()).getName())).getAbsolutePath();
 					String pngFile = new File(outputDir, String.format("000_%s.png", new File(clip.getFilename()).getName())).getAbsolutePath();
 					
-					OutputStream img = new FileOutputStream(pgmFile);
+					OutputStream img = new FileOutputStream(pngFile);
 					spectrogramWriter.write(img, spec);
-					
-					// Try to convert the spectrogram from PGM to PNG.
-					Process result = Runtime.getRuntime().exec(new String[] {
-						"convert",
-						pgmFile,
-						pngFile});
-					// Delete PGM file if conversion was successful
-					if (result.waitFor() == 0) {
-						new File(pgmFile).deleteOnExit();
-					}
-					// If it wasn't, notify the user
-					else {
-						System.err.println("WARNING: couldn't convert spectrogram PGM to PNG. Please install ImageMagick.");
-					}
 					
 					// Update spectrogram for this report entry
 					entry.setSpectrogram(IOHelper.getRelativePath(clOptions.getReportPath(), new File(pngFile)));
@@ -506,7 +544,7 @@ public class BulkTest {
 					for (File histFile : outputDir.listFiles()) {
 						if (histFile.getName().endsWith(".txt")) {
 							String inFile  = histFile.getAbsolutePath();
-							String outFile = String.format("%s.png", inFile.substring(0, inFile.length()));
+							String outFile = inFile.substring(0, inFile.length());
 							String script  = String.format(rScript, outFile, inFile);
 							
 							Process exec = Runtime.getRuntime().exec("R --vanilla");

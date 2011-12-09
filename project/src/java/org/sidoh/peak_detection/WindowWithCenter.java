@@ -29,7 +29,7 @@ public class WindowWithCenter {
 		k = windowSize / 2;
 		windowLeft = new SlidingWindow(k);
 		windowRight = new SlidingWindow(k);
-		x = 0;
+		x = Double.NaN;
 	}
 	
 	/**
@@ -43,10 +43,10 @@ public class WindowWithCenter {
 		// Push value onto the right window.
 		double shifted = windowRight.pushValue(value);
 		
-		if (shifted != Double.NEGATIVE_INFINITY) {
-			windowLeft.pushValue(x);
+		if (! Double.isInfinite(shifted)) {
+			double leftShifted = windowLeft.pushValue(x);
 			x = shifted;
-			return true;
+			return !Double.isInfinite(leftShifted);
 		}
 		
 		return false;

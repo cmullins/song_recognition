@@ -13,7 +13,7 @@ public class BulkDbBuilder {
 		Settings settings = Settings.defaults();
 		
 		if (args.length < 2) {
-			System.err.println("Syntax is: BulkDbBuilder <db_file> <wavfile1> <wavfile2> ... <wavfileN>");
+			System.err.println("Syntax is: BulkDbBuilder <db_file> <wavs_dir>");
 			System.exit(1);
 		}
 		
@@ -26,14 +26,25 @@ public class BulkDbBuilder {
 					settings.getStarHashExtractor(),
 					settings.getBufferBuilder(),
 					settings.getSpectrogramBuilder());
+		
+		File wavsDir = new File(args[1]);
+		if (! wavsDir.exists()) {
+			System.err.println("Wav directory doesn't exist!");
+			System.exit(1);
+		}
+		else if (! wavsDir.isDirectory()) {
+			System.err.println("specified wav directory isn't a directory!");
+			System.exit(1);
+		}
 
-		for (int i = 1; i < args.length; i++) {
-			System.out.println("Loading " + args[i] + "...");
-			dbBuilder.addSong(new File(args[i]).getName(), args[i]);
+		for (File wav : wavsDir.listFiles()) {
+			String file = wav.getAbsolutePath();
+			System.out.println("Processing: " + file);
+			dbBuilder.addSong(wav.getName(), wav.getAbsolutePath());
 			System.out.println("--------------------------------------------------------------------------------------------------------");
 		}
 		
-		System.out.println("Creating indexes...");
-		db.createIndexes();
+		//System.out.println("Creating indexes...");
+		//db.createIndexes();
 	}
 }

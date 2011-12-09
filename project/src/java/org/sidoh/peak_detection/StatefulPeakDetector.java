@@ -1,5 +1,16 @@
 package org.sidoh.peak_detection;
 
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
+
 /**
  * Performs the same operation as a {@link StatelessPeakDetector}, but allows the
  * class to have state. This should be used where asynchronous stuff is happening.
@@ -13,16 +24,25 @@ public abstract class StatefulPeakDetector implements ValueListener {
 		public abstract StatefulPeakDetector create(PeakListener peaks);
 		
 		public Builder withSmoothingFunction(StatefulSmoothingFunction.Builder smoothingFnBuilder) {
-			return new StatefulSmoothedPeakDetector.Builder(smoothingFnBuilder, this);
+			if (smoothingFnBuilder == null) {
+				return this;
+			}
+			else {
+				return new StatefulSmoothedPeakDetector.Builder(smoothingFnBuilder, this);
+			}
 		}
 	}
 	
 	private final PeakListener peaks;
 	private int index;
-
+	
+	private static int counter = 0;
+	protected int count;
+	
 	public StatefulPeakDetector(PeakListener peaks) {
 		this.peaks = peaks;
 		this.index = 0;
+		count = counter++;
 	}
 	
 	/**
@@ -30,14 +50,14 @@ public abstract class StatefulPeakDetector implements ValueListener {
 	 * 
 	 * @param index
 	 */
-	protected void offerPeak(int index, double value) {
+	protected final void offerPeak(int index, double value) {
 		peaks.peakDetected(index, value);
 	}
 	
 	/**
 	 * 
 	 */
-	public synchronized void offerNewValue(double value) {
+	public final void offerNewValue(double value) {
 		handleNewInput(index++, value);
 	}
 	
@@ -57,7 +77,7 @@ public abstract class StatefulPeakDetector implements ValueListener {
 	 * @return
 	 */
 	public static StatefulSdsFromMeanPeakDetector.Builder sdsFromMean(int windowWidth, double sds) {
-		return new StatefulSdsFromMeanPeakDetector.SdsFromMeanBuilder(windowWidth, sds);
+		return new StatefulSdsFromMeanPeakDetector.Builder(windowWidth, sds);
 	}
 	
 	/**

@@ -13,6 +13,10 @@ public class StatefulExponentialSmoothingFunction extends StatefulSmoothingFunct
 		public StatefulSmoothingFunction create() {
 			return new StatefulExponentialSmoothingFunction(smoothingFactor);
 		}
+		
+		public double getSmoothingFactor() {
+			return smoothingFactor;
+		}
 	}
 	
 	private final double smoothingFactor;

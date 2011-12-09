@@ -46,8 +46,9 @@ public class StatefulMeanDeltaPeakDetector extends StatefulPeakDetector {
 		// Don't do anything if the window isn't full
 		if (window.offer(value)) {
 			// Check delta values
-			if (window.left().meanDelta() > 0 && window.right().meanDelta() < 0
-				&& window.x() > lambda*window.left().max() && window.x() > lambda*window.right().max()) {
+			if (window.x() > lambda*window.left().max() 
+				&& window.x() > lambda*window.right().max()) {
+				
 				offerPeak((index - k), window.x());
 			}
 		}

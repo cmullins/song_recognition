@@ -12,6 +12,7 @@ public abstract class Spectrogram {
 		private boolean configured = false;
 		private int contrast = 1;
 		private int brightness = 0;
+		private boolean inverted = false;
 		private ConfigurableSpectrogram.Scale scale = ConfigurableSpectrogram.Scale.LINEAR;
 		private ProgressNotifier.Builder notifier;
 		
@@ -62,6 +63,12 @@ public abstract class Spectrogram {
 			return this;
 		}
 		
+		public Builder invert() {
+			configured = true;
+			this.inverted = true;
+			return this;
+		}
+		
 		public Builder progressNotifier(ProgressNotifier.Builder notifier) {
 			this.notifier = notifier;
 			return this;
@@ -81,7 +88,8 @@ public abstract class Spectrogram {
 				spec = new ConfigurableSpectrogram(spec)
 				 .setBrightness(brightness)
 				 .setContrast(contrast)
-				 .setScale(scale);
+				 .setScale(scale)
+				 .setInverted(inverted);
 			}
 			
 			return spec;

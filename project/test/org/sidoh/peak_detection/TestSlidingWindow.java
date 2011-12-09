@@ -8,34 +8,18 @@ public class TestSlidingWindow {
 
 	@Test
 	public void test() {
-		SlidingWindow w = new SlidingWindow(2);
+		double[] values = {0.1,0.2,0.1,0.7,0.8,0.9,0.1,0.2,0.3};
+		double[] max    = {0.1,0.2,0.2,0.7,0.8,0.9,0.9,0.9,0.9};
+		double[] min    = {0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1};
 		
-		w.pushValue(0.1);
+		SlidingWindow w = new SlidingWindow(4);
 		
-		System.out.println(w + ", delta = " + w.meanDelta());
-		w.pushValue(0.2);
-		
-		System.out.println(w + ", delta = " + w.meanDelta());
-		
-		w.pushValue(0.3);
-		
-		System.out.println(w + ", delta = " + w.meanDelta());
-		
-		w.pushValue(0.1);
-		
-		System.out.println(w + ", delta = " + w.meanDelta());
-		
-		w.pushValue(0.01);
-		
-		System.out.println(w + ", delta = " + w.meanDelta());
-		
-		w.pushValue(0.01);
-		
-		System.out.println(w + ", delta = " + w.meanDelta());
-		
-		w.pushValue(0.01);
-		
-		System.out.println(w + ", delta = " + w.meanDelta());
+		for (int i = 0; i < values.length; i++) {
+			w.pushValue(values[i]);
+			
+			assertEquals(max[i], w.max(), 0.01);
+			assertEquals(min[i], w.min(), 0.01);
+		}
 	}
 
 }

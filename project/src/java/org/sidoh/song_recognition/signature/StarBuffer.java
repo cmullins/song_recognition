@@ -21,6 +21,9 @@ import org.sidoh.song_recognition.spectrogram.Spectrogram;
 public abstract class StarBuffer {
 	
 	public static abstract class Builder {
+		protected static final double[] fairSizes   = {0.05d, 0.15, 0.40d};
+		protected static final double[] fairWeights = {0.1d, 0.7d, 0.2d};
+		
 		protected double starDensityFactor;
 		
 		public Builder(double starDensityFactor) {
@@ -30,6 +33,18 @@ public abstract class StarBuffer {
 		public Builder starDensityFactor(double starDensityFactor) {
 			this.starDensityFactor = starDensityFactor;
 			return this;
+		}
+		
+		public EvenFrequencyBandsStarBuffer.Builder evenlyBanded(int numBands) {
+			return new EvenFrequencyBandsStarBuffer.Builder(numBands, this);
+		}
+		
+		public ManuallyBucketizedFrequencyBandsStarBuffer.Builder manuallyBanded(double[] bandSizes, double[] bandWeights) {
+			return new ManuallyBucketizedFrequencyBandsStarBuffer.Builder(starDensityFactor, bandSizes, bandWeights, this);
+		}
+		
+		public ManuallyBucketizedFrequencyBandsStarBuffer.Builder fairlyBanded() {
+			return manuallyBanded(fairSizes, fairWeights);
 		}
 		
 		public abstract StarBuffer create(Spectrogram spec);

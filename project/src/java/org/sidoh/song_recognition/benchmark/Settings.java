@@ -3,8 +3,12 @@ package org.sidoh.song_recognition.benchmark;
 import java.io.Serializable;
 
 import org.sidoh.io.ProgressNotifier;
+import org.sidoh.peak_detection.StatefulExponentialSmoothingFunction;
+import org.sidoh.peak_detection.StatefulMeanDeltaPeakDetector;
 import org.sidoh.peak_detection.StatefulPeakDetector;
 import org.sidoh.peak_detection.StatefulSdsFromMeanPeakDetector;
+import org.sidoh.peak_detection.StatefulSmoothedPeakDetector;
+import org.sidoh.peak_detection.StatefulSmoothingFunction;
 import org.sidoh.song_recognition.audio_io.FrameBuffer;
 import org.sidoh.song_recognition.audio_io.WavFile;
 import org.sidoh.song_recognition.signature.ConstellationMapExtractor;
@@ -42,12 +46,12 @@ public class Settings implements Serializable {
 	 * Progress notifier to use for various things that take a while
 	 */
 	private ProgressNotifier.Builder progressNotifer
-		= ProgressNotifier.consoleNotifier(50);
+		= ProgressNotifier.nullNotifier();
 	
 	/**
 	 * This controls how many peaks are kept from each song
 	 */
-	private double starDensityFactor = 0.2d;
+	private double starDensityFactor = 0.4d;
 	
 	/**
 	 * Controls how granular time is in signatures, etc.
@@ -61,7 +65,7 @@ public class Settings implements Serializable {
 	 * results in more space taken for hash values, and more time taken for
 	 * computing matches (and more memory taken for the spectrogram).
 	 */
-	private double frameOverlap = 0.05d;
+	private double frameOverlap = 0.25d;
 	
 	/**
 	 * This defines the number of samples in a frame. The higher the number,
@@ -69,7 +73,7 @@ public class Settings implements Serializable {
 	 * be. Note that due to restrictions in the DCT, this must be a power of 
 	 * two.
 	 */
-	private int frameSize = 512;
+	private int frameSize = 1024;
 	
 	/**
 	 * Responsible for building transform functions. 
@@ -88,12 +92,25 @@ public class Settings implements Serializable {
 	/**
 	 * Window size for peak detector
 	 */
-	private int windowSize = 250;
+	private int windowSize = 100;
 	
 	/**
-	 * Num SDs above mean.
+	 * Num SDs above mean for use in {@link StatefulSdsFromMeanPeakDetector}.
 	 */
-	private double nSdsAboveMean = 3;
+	private double nSdsAboveMean = 1;
+	
+	/**
+	 * Smoothing factor to use for {@link StatefulExponentialSmoothingFunction}.
+	 */
+	private double exponentialSmoothingFactor = 0.5;
+	
+	/**
+	 * {@link StatefulSmoothingFunction} to use in {@link StatefulPeakDetector}. If
+	 * you don't want to use one, set this = null.
+	 */
+	private StatefulSmoothingFunction.Builder peakDetectorSmoothingFunction
+//		= null;
+	    = StatefulSmoothingFunction.exponentialSmoother(exponentialSmoothingFactor);
 	
 	/**
 	 * Peak detection algorithm to use. Because of the way spectrograms are 
@@ -101,18 +118,20 @@ public class Settings implements Serializable {
 	 * large memory buffers necessary.
 	 */
 	private StatefulPeakDetector.Builder peakDetector
-		= StatefulPeakDetector.sdsFromMean(windowSize, nSdsAboveMean);
+//		= StatefulPeakDetector.sdsFromMean(windowSize, nSdsAboveMean).withSmoothingFunction(peakDetectorSmoothingFunction);
+		= StatefulPeakDetector.meanDelta(windowSize).withSmoothingFunction(peakDetectorSmoothingFunction);
 
-	/**ll usually involve some calculation
-	 * using {@link #starDensityFactor}.
+	/** 
+	 * Controls which stars from the peak detectors are retained. The number of
+	 * stars that are kept usually involve some calculation using 
+	 * {@link #starDensityFactor}.
 	 */
 	private StarBuffer.Builder starSelectionBuffer
 		= StarBuffer.evenlySpreadInTime(starDensityFactor);
 	
 	/**
 	 * The maximum number of threads to use in processes that are capable of doing 
-	 * parallel processing. The default is the number o
-	 * This controls how stars are selected. It wif processors on the current
+	 * parallel processing. The default is the number of processors on the current
 	 * machine.
 	 */
 	private int maxNumThreads
@@ -131,7 +150,7 @@ public class Settings implements Serializable {
 	 * hashing.
 	 */
 	private Region.Builder regionBuilder
-		= Region.rectangularRegion(100, -3, 10, 300);
+		= Region.rectangularRegion(1, 10, 20, 250);
 	
 	/**
 	 * This performs the same function as {@link #regionBuilder}, but is used when
@@ -239,12 +258,34 @@ public class Settings implements Serializable {
 		return nSdsAboveMean;
 	}
 	
+	public double getExponentialSmoothingFactor() {
+		return exponentialSmoothingFactor;
+	}
+	
 	public SpectrogramWriter getSpectrogramWriter() {
 		return new PgmSpectrogramConstellationWriter(constellationExtractor, progressNotifer);
 	}
 	
 	public StarBuffer.Builder getStarSelectionBuffer() {
 		return starSelectionBuffer;
+	}
+	
+	public StatefulSmoothingFunction.Builder getSmoothingFunction() {
+		return peakDetectorSmoothingFunction;
+	}
+	
+	public Settings setExponentialSmoothingFactor(double exponentialSmoothingFactor) {
+		this.exponentialSmoothingFactor = exponentialSmoothingFactor;
+		if (peakDetectorSmoothingFunction != null 
+			&& peakDetectorSmoothingFunction instanceof StatefulExponentialSmoothingFunction.Builder) {
+			return setSmoothingFunction(StatefulSmoothingFunction.exponentialSmoother(exponentialSmoothingFactor));
+		}
+		return this;
+	}
+	
+	public Settings setSmoothingFunction(StatefulSmoothingFunction.Builder builder) {
+		peakDetectorSmoothingFunction = builder;
+		return setPeakDetector(peakDetector.withSmoothingFunction(peakDetectorSmoothingFunction));
 	}
 	
 	public Settings setNSdsAboveMean(double nSdsAboveMean) {
@@ -260,8 +301,24 @@ public class Settings implements Serializable {
 		if (peakDetector instanceof StatefulSdsFromMeanPeakDetector.Builder) {
 			return this.setPeakDetector(StatefulPeakDetector.sdsFromMean(windowSize, nSdsAboveMean));
 		}
-		else {
+		else if (peakDetector instanceof StatefulMeanDeltaPeakDetector.Builder) {
 			return this.setPeakDetector(StatefulPeakDetector.meanDelta(windowSize));
+		}
+		else {
+			StatefulSmoothedPeakDetector.Builder builder = (StatefulSmoothedPeakDetector.Builder)peakDetector;
+			StatefulPeakDetector.Builder inner = builder.innerBuilder();
+			StatefulSmoothingFunction.Builder smoothingFn = builder.smoothingFunction();
+			
+			if (inner instanceof StatefulSdsFromMeanPeakDetector.Builder) {
+				inner = StatefulPeakDetector.sdsFromMean(windowSize, nSdsAboveMean);
+			}
+			else {
+				inner = StatefulPeakDetector.meanDelta(windowSize);
+			}
+			
+			inner = inner.withSmoothingFunction(smoothingFn);
+			
+			return this.setPeakDetector(inner);
 		}
 	}
 	
@@ -293,7 +350,7 @@ public class Settings implements Serializable {
 	}
 
 	public Settings setPeakDetector(StatefulPeakDetector.Builder peakDetector) {
-		this.peakDetector = peakDetector;
+		this.peakDetector = peakDetector.withSmoothingFunction(getSmoothingFunction());
 		this.constellationExtractor
 			= new ConstellationMapExtractor(peakDetector, starDensityFactor, progressNotifer, starSelectionBuffer, maxNumThreads);
 		this.starHashExtractor

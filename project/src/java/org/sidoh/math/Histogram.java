@@ -23,6 +23,10 @@ public class Histogram {
 		int bin = (int)Math.floor(value);
 		values.increment(bin);
 	}
+	
+	public void reset() {
+		values.reset();
+	}
 
 	public int getMaxCount() {
 		return values.getMaxCount();

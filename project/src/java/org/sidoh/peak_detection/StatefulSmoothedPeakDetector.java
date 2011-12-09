@@ -20,6 +20,19 @@ public class StatefulSmoothedPeakDetector extends StatefulPeakDetector {
 					smoothingFnBuilder.create(),
 					innerBuilder.create(peaks));
 		}
+		
+		@Override
+		public StatefulPeakDetector.Builder withSmoothingFunction(StatefulSmoothingFunction.Builder builder) {
+			return innerBuilder.withSmoothingFunction(builder);
+		}
+		
+		public StatefulPeakDetector.Builder innerBuilder() {
+			return innerBuilder;
+		}
+		
+		public StatefulSmoothingFunction.Builder smoothingFunction() {
+			return smoothingFnBuilder;
+		}
 	}
 	
 	private final StatefulPeakDetector inner;
@@ -39,5 +52,4 @@ public class StatefulSmoothedPeakDetector extends StatefulPeakDetector {
 	protected void handleNewInput(int index, double value) {
 		inner.handleNewInput(index, smoothingFn.smooth(value));
 	}
-
 }

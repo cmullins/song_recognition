@@ -4,6 +4,7 @@ import java.util.Deque;
 import java.util.LinkedList;
 
 import org.junit.Test;
+import static org.junit.Assert.*;
 
 public class TestDoubleDeque {
 
@@ -35,7 +36,7 @@ public class TestDoubleDeque {
 				double v1 = dd.removeFirst();
 				double v2 = jd.removeFirst();
 				
-				assert(v1 == v2);
+				assertEquals(v1,v2,0.001);
 			}
 			
 			dd.addLast(i);
@@ -45,8 +46,8 @@ public class TestDoubleDeque {
 		while (jd.size() > 0) {
 			double v1 = dd.removeFirst();
 			double v2 = jd.removeFirst();
-			
-			assert(v1 == v2);
+
+			assertEquals(v1,v2,0.001);
 		}
 	}
 
@@ -58,7 +59,7 @@ public class TestDoubleDeque {
 			dd.addLast(i);
 		}
 		
-		assert(dd.peekFirst() == 0d);
-		assert(dd.peekLast() == 99d);
+		assertEquals(dd.peekFirst(),0d,0.001);
+		assertEquals(dd.peekLast(),99d,0.001);
 	}
 }

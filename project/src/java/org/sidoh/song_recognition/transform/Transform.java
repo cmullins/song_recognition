@@ -15,7 +15,7 @@ public interface Transform {
 
 		private Builder(int frameSize) {
 			this.frameSize = frameSize;
-			this.vorbis = false;
+			this.vorbis = true;
 		}
 		
 		public static Builder frameSize(int size) {
