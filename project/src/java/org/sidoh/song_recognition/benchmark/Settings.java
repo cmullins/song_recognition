@@ -65,7 +65,7 @@ public class Settings implements Serializable {
 	 * results in more space taken for hash values, and more time taken for
 	 * computing matches (and more memory taken for the spectrogram).
 	 */
-	private double frameOverlap = 0.25d;
+	private double frameOverlap = 0.50d;
 	
 	/**
 	 * This defines the number of samples in a frame. The higher the number,

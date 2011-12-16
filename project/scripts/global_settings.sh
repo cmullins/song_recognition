@@ -1,6 +1,6 @@
 #!/bin/bash
 
-SAMPLE_RATE=44100
+SAMPLE_RATE=16000
 MAX_PARALLEL_PROCESSES=8
 
 # Max memory the Java VM should be allowed to comsume

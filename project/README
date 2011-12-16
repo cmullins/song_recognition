@@ -1,15 +1,13 @@
 ================================================================================
-================================================================================
-================================================================================
 LICENSE
+================================================================================
 
 This software is released under the MIT license. See LICENSE for more
 information.
 
 ================================================================================
-================================================================================
-================================================================================
 PREPARING SONG DATA
+================================================================================
 
 If you are using UNIX, ./scripts/experiment_setup.sh will do almost all of the
 work for you. It makes use of several common utilties which must be installed
@@ -17,7 +15,7 @@ first:
     - sox: http://sox.sourceforge.net/
     - mpg123: http://www.mpg123.de/
 
-After installing the prerequisite software, simply place any song files you want
+After installing the prerequisite software, simply place any MP3 files you want
 to test into the directory ./songs/mp3s and run the script. It will do the
 following with each song:
     1. Convert to a standardized format: 44.1 KHz PCM wav, and named in a way
@@ -32,9 +30,8 @@ following with each song:
        PCM wavs.
 
 ================================================================================
+USING THIS SOFTWARE
 ================================================================================
-================================================================================
-ABOUT
 
 Software is written in Java. The names of programs to follow indicate the name
 of the Java class file the program is contained in.
@@ -101,9 +98,8 @@ PROGRAMS AVAILABLE FOR USE, ALL RUNNABLE THROUGH ANT:
    - Writes raw results to a csv file in report directory (raw.txt).
 
 ================================================================================
-================================================================================
-================================================================================
 TYPICAL WORKFLOW
+================================================================================
 
 1. Generate song data. Put files in ./songs/mp3s and run
    ./scripts/experiment_setup.sh.

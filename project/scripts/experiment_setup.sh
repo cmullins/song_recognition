@@ -64,7 +64,7 @@ for sample in $(ls *.wav | grep "[0-9][0-9]*.wav"); do
 
 		if [ ! -f "$new_sample_name" ]; then
 			echo "Adding noise: $new_sample_name"
-			sox -m $sample $noise $new_sample_name
+			sox -m -r ${SAMPLE_RATE} $sample -r ${SAMPLE_RATE} $noise $new_sample_name trim 0 $sample_len
 		fi
 	done
 done

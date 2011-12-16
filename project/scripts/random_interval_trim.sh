@@ -9,7 +9,7 @@ source $DIR/global_settings.sh
 ###### Script that creates clips from a WAV using a randomly generated interval
 
 ###### SETTINGS ########
-SAMPLE_LENGTHS="15 20 25"
+SAMPLE_LENGTHS="20"
 
 wav_file=$1
 samples_dir=$2
